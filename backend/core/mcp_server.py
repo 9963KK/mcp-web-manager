@@ -17,7 +17,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse, Response, PlainTextResponse, RedirectResponse
 from starlette.routing import BaseRoute, Mount, Route
 from starlette.types import Receive, Scope, Send
 
@@ -88,10 +88,23 @@ def create_single_instance_routes(
 
     async def handle_streamable_http_instance(scope: Scope, receive: Receive, send: Send) -> None:
         _update_global_activity()
+        # 仅允许 POST；其他方法返回 405 说明，避免日志中的 ASGI 错误
+        method = scope.get("method")
+        if method and method.upper() != "POST":
+            response = PlainTextResponse(
+                "Method Not Allowed. Use POST to /mcp/ for Streamable HTTP.", status_code=405
+            )
+            await response(scope, receive, send)
+            return
         await http_session_manager.handle_request(scope, receive, send)
 
+    async def redirect_mcp(_: Request) -> Response:
+        # 将 /mcp 重定向到 /mcp/，保留方法（307）避免部分客户端不规范的路径问题
+        return RedirectResponse(url="/mcp/", status_code=307)
+
     routes = [
-        Mount("/mcp", app=handle_streamable_http_instance),
+        Route("/mcp", endpoint=redirect_mcp),
+        Mount("/mcp/", app=handle_streamable_http_instance),
         Route("/sse", endpoint=handle_sse_instance),
         Mount("/messages/", app=sse_transport.handle_post_message),
     ]
