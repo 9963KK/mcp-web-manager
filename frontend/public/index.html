@@ -200,25 +200,43 @@
                 <div class="modal-title" id="jsonModalTitle">使用 JSON 添加 MCP 服务</div>
             </div>
             <div class="modal-body">
-                <p class="help-text">支持粘贴 <strong>单个对象</strong> 或 <strong>对象数组</strong>，字段与后端 <code>MCPServiceCreate</code> 一致。</p>
-                <p class="help-text">示例（单个对象）：</p>
+                <p class="help-text">支持 <strong>通用 MCP 配置</strong> 与 <strong>内部批量/单对象</strong> 三种格式（会自动识别）：</p>
+
+                <p class="help-text"><strong>1) 通用：Claude Desktop / mcp-proxy 的 mcpServers</strong></p>
+                <pre class="help-text" style="white-space: pre-wrap; background:#fafafa; border:1px solid #eee; padding:8px; border-radius:6px;">{
+  "mcpServers": {
+    "fetch": {
+      "enabled": true,
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "env": { "API_KEY": "xxxxx" },
+      "cwd": "/root"
+    }
+  }
+}</pre>
+
+                <p class="help-text"><strong>2) 标准批量：services 数组</strong></p>
+                <pre class="help-text" style="white-space: pre-wrap; background:#fafafa; border:1px solid #eee; padding:8px; border-radius:6px;">{
+  "services": [
+    { "name": "a", "command": "uvx", "args": ["mcp-server-a"] },
+    { "name": "b", "command": "uvx", "args": ["mcp-server-b"], "env_vars": {"FLAG": "1"} }
+  ]
+}</pre>
+
+                <p class="help-text"><strong>3) 单对象：等同创建一个服务</strong></p>
                 <pre class="help-text" style="white-space: pre-wrap; background:#fafafa; border:1px solid #eee; padding:8px; border-radius:6px;">{
   "name": "fetch",
   "description": "示例 stdio 服务",
-  "command": "uvx mcp-server-fetch",
-  "args": ["--verbose"],
+  "command": "uvx",
+  "args": ["mcp-server-fetch", "--verbose"],
   "env_vars": {"API_KEY": "xxxxx"},
   "working_directory": "/root",
   "streamhttp_host": "127.0.0.1",
   "auto_restart": true,
   "timeout": 60
 }</pre>
-                <p class="help-text">示例（数组）：</p>
-                <pre class="help-text" style="white-space: pre-wrap; background:#fafafa; border:1px solid #eee; padding:8px; border-radius:6px;">[
-  {"name":"a","command":"uvx mcp-server-a"},
-  {"name":"b","command":"uvx mcp-server-b","args":["--flag"]}
-]</pre>
-                <textarea id="jsonInput" class="textarea" placeholder='粘贴 JSON 到这里，回车不会提交，可多行编辑'></textarea>
+
+                <textarea id="jsonInput" class="textarea" placeholder='粘贴 JSON 到这里，优先按通用 mcpServers 结构解析；也可使用 {services:[...]} 或单对象'></textarea>
             </div>
             <div class="modal-footer">
                 <button class="btn inline-btn" onclick="closeJsonModal()">取消</button>
