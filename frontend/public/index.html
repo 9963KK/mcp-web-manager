@@ -86,6 +86,7 @@
         .btn-danger {
             background: #dc3545;
         }
+        .btn-secondary { background: #6c757d; }
         
         .service-list {
             list-style: none;
@@ -121,6 +122,8 @@
             padding: 2rem;
             color: #666;
         }
+        .details-box { margin-top: 12px; padding: 12px; background: #f9fafc; border: 1px solid #eee; border-radius: 8px; }
+        .code-block { white-space: pre-wrap; background:#fafafa; border:1px solid #eee; padding:8px; border-radius:6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 0.9rem; }
         /* JSON 导入弹窗样式 */
         .modal-backdrop {
             position: fixed;
@@ -175,7 +178,6 @@
             <button class="btn" onclick="addService()">添加服务</button>
             <button class="btn" onclick="openJsonModal()">从JSON添加</button>
             <button class="btn" onclick="refreshData()">刷新数据</button>
-            <button class="btn" onclick="exportConfig()">导出配置</button>
             <button class="btn" onclick="showDocs()">查看API文档</button>
         </div>
         
@@ -411,7 +413,7 @@
                     ${services.map(service => `
                         <li class="service-item">
                             <div>
-                                <strong>${service.name}</strong>
+                                <strong style="cursor:pointer" onclick="toggleServiceDetails(${service.id})" title="点击展开配置">${service.name}</strong>
                                 <br>
                                 <small>${service.description || '无描述'}</small>
                             </div>
@@ -424,12 +426,71 @@
                                 </button>
                                 <button class="btn btn-sm btn-danger" onclick="deleteService(${service.id}, '${service.name.replace(/'/g, "\\'")}')">删除</button>
                             </div>
+                            <div class="details-box" id="svc-${service.id}" style="display:none">
+                                <div>
+                                    <div><strong>StreamHTTP:</strong> <code id="url-${service.id}">加载中...</code> <button class="btn inline-btn btn-secondary" onclick="copyServiceUrl(${service.id})">复制</button></div>
+                                    <div style="margin-top:8px;">
+                                        <strong>Claude Desktop 片段:</strong>
+                                        <pre class="code-block" id="claude-${service.id}">加载中...</pre>
+                                        <button class="btn inline-btn btn-secondary" onclick="copyClaude(${service.id})">复制</button>
+                                    </div>
+                                </div>
+                            </div>
                         </li>
                     `).join('')}
                 </ul>
             `;
             
             list.innerHTML = html;
+        }
+
+        // 服务配置缓存
+        const servicesCache = {};
+        const serviceConfigs = {};
+
+        // 切换展开详情
+        async function toggleServiceDetails(serviceId) {
+            const box = document.getElementById(`svc-${serviceId}`);
+            if (!box) return;
+            if (box.style.display === 'block') { box.style.display = 'none'; return; }
+            try {
+                // 缓存服务基本信息
+                if (!servicesCache[serviceId]) {
+                    // 从当前列表 DOM 里找不到直接对象，这里依赖最近一次 loadServices 缓存
+                }
+                // 加载配置
+                const cfg = await ensureServiceConfig(serviceId);
+                const streamUrl = (cfg && cfg.urls && cfg.urls.streamhttp) ? cfg.urls.streamhttp : '';
+                const sseUrl = (cfg && cfg.urls && cfg.urls.sse) ? cfg.urls.sse : '';
+                document.getElementById(`url-${serviceId}`).textContent = streamUrl || '未获取到URL';
+                const name = cfg && cfg.service_name ? cfg.service_name : (servicesCache[serviceId]?.name || `service-${serviceId}`);
+                const env = (cfg && cfg.config && cfg.config.env) ? cfg.config.env : (servicesCache[serviceId]?.env_vars || {});
+                const snippetObj = { mcpServers: { [name]: { command: 'mcp-proxy', args: [ sseUrl || streamUrl.replace('/mcp','/sse') ], ...(env && Object.keys(env).length ? { env } : {}) } } };
+                document.getElementById(`claude-${serviceId}`).textContent = JSON.stringify(snippetObj, null, 2);
+            } catch (e) {
+                document.getElementById(`url-${serviceId}`).textContent = '获取失败';
+                document.getElementById(`claude-${serviceId}`).textContent = String(e);
+            }
+            box.style.display = 'block';
+        }
+
+        async function ensureServiceConfig(serviceId) {
+            if (serviceConfigs[serviceId]) return serviceConfigs[serviceId];
+            const resp = await fetch(`/api/config/export/service/${serviceId}`);
+            const data = await resp.json();
+            serviceConfigs[serviceId] = data;
+            return data;
+        }
+
+        function copyServiceUrl(serviceId) {
+            const el = document.getElementById(`url-${serviceId}`);
+            if (!el) return;
+            navigator.clipboard.writeText(el.textContent || '').then(() => alert('已复制 StreamHTTP 地址')).catch(() => alert('复制失败'));
+        }
+        function copyClaude(serviceId) {
+            const el = document.getElementById(`claude-${serviceId}`);
+            if (!el) return;
+            navigator.clipboard.writeText(el.textContent || '').then(() => alert('已复制 Claude 配置片段')).catch(() => alert('复制失败'));
         }
         
         // 删除服务
@@ -555,26 +616,7 @@
             }
         }
         
-        // 导出配置
-        async function exportConfig() {
-            try {
-                const response = await fetch('/api/config/export');
-                const config = await response.json();
-                
-                const configText = JSON.stringify(config, null, 2);
-                const blob = new Blob([configText], {type: 'application/json'});
-                const url = URL.createObjectURL(blob);
-                
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'mcp-config.json';
-                a.click();
-                
-                URL.revokeObjectURL(url);
-            } catch (error) {
-                alert('导出失败: ' + error.message);
-            }
-        }
+        // 已移除“导出配置”按钮与下载逻辑，改为在服务项内展开复制
         
         // 显示API文档
         function showDocs() {
