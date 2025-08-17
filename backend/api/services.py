@@ -1,10 +1,11 @@
 """API路由处理器 - MCP服务管理."""
 
 from typing import List
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from database import get_db
+from database import get_db, SessionLocal
 from database.crud import service_crud, status_log_crud, proxy_instance_crud
 from schemas import (
     MCPServiceCreate,
@@ -141,7 +142,16 @@ async def service_action(
     if action.action == "start":
         success, message = await mcp_service_manager.start_service(db, service)
     elif action.action == "stop":
-        success, message = await mcp_service_manager.stop_service(db, service_id)
+        # 异步后台停止，快速响应
+        async def _stop_in_background(svc_id: int):
+            local_db = SessionLocal()
+            try:
+                await mcp_service_manager.stop_service(local_db, svc_id)
+            finally:
+                local_db.close()
+
+        asyncio.create_task(_stop_in_background(service_id))
+        success, message = True, "停止指令已发送，正在停止..."
     elif action.action == "restart":
         success, message = await mcp_service_manager.restart_service(db, service)
     

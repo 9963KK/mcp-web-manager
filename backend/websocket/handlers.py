@@ -154,6 +154,14 @@ class ServiceEventBroadcaster:
             "name": service_name,
             "message": f"服务 {service_name} 已停止"
         })
+
+    @staticmethod
+    async def service_stopping(service_id: int, service_name: str):
+        """服务停止中事件."""
+        await manager.broadcast_service_event("stopping", service_id, {
+            "name": service_name,
+            "message": f"服务 {service_name} 正在停止..."
+        })
     
     @staticmethod
     async def service_error(service_id: int, service_name: str, error: str):

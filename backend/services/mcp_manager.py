@@ -179,6 +179,12 @@ class MCPServiceManager:
             
             # 更新状态为停止中
             service_crud.update_status(db, service_id, ServiceStatus.STOPPING, "正在停止服务...")
+            # 广播停止中
+            broadcaster = get_event_broadcaster()
+            if broadcaster:
+                service = service_crud.get_by_id(db, service_id)
+                if service:
+                    asyncio.create_task(broadcaster.service_stopping(service_id, service.name))
             
             # 取消任务
             task = service_info["task"]
