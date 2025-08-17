@@ -102,6 +102,8 @@ async def run_mcp_server(
     mcp_settings: MCPServerSettings,
     default_server_params: StdioServerParameters | None = None,
     named_server_params: dict[str, StdioServerParameters] | None = None,
+    *,
+    mount_base: str = "/servers",
 ) -> None:
     """Run stdio client(s) and expose an MCP server with multiple possible backends."""
     if named_server_params is None:
@@ -159,8 +161,13 @@ async def run_mcp_server(
                 http_manager_named.run(),
             )  # Manage lifespan by calling run()
 
-            # Mount these routes under /servers/<name>/
-            server_mount = Mount(f"/servers/{name}", routes=instance_routes_named)
+            # Mount these routes under mount_base/<name>/
+            normalized_base = mount_base.rstrip("/")
+            if normalized_base == "":
+                mount_path = f"/{name}"
+            else:
+                mount_path = f"{normalized_base}/{name}"
+            server_mount = Mount(mount_path, routes=instance_routes_named)
             all_routes.append(server_mount)
             _global_status["server_instances"][name] = "configured"
 
@@ -205,7 +212,12 @@ async def run_mcp_server(
             sse_urls.append(f"{base_url}/sse")
 
         # Add named servers
-        sse_urls.extend([f"{base_url}/servers/{name}/sse" for name in named_server_params])
+        for name in named_server_params:
+            normalized_base = mount_base.rstrip("/")
+            if normalized_base == "":
+                sse_urls.append(f"{base_url}/{name}/sse")
+            else:
+                sse_urls.append(f"{base_url}{normalized_base}/{name}/sse")
 
         # Display the SSE URLs prominently
         if sse_urls:

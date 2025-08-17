@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class PortManager:
     """端口分配管理器."""
     
-    def __init__(self, start_port: int = 8000, end_port: int = 9000):
+    def __init__(self, start_port: int = 10000, end_port: int = 19999):
         self.start_port = start_port
         self.end_port = end_port
         self.allocated_ports: set = set()
@@ -80,18 +80,20 @@ class MCPServiceManager:
             
             # 创建MCP服务器设置
             mcp_settings = MCPServerSettings(
-                bind_host=service.streamhttp_host,
+                bind_host=service.streamhttp_host or "0.0.0.0",
                 port=port,
                 stateless=False,
                 allow_origins=["*"],  # 开发环境允许所有来源
                 log_level="INFO"
             )
             
-            # 启动MCP代理服务器
+            # 启动MCP代理服务器（以命名服务器方式挂载到 /{service.name} 下）
             task = asyncio.create_task(
                 run_mcp_server(
                     mcp_settings=mcp_settings,
-                    default_server_params=stdio_params
+                    default_server_params=None,
+                    named_server_params={service.name: stdio_params},
+                    mount_base=""  # 根路径，形如 /{name}/mcp
                 )
             )
             
@@ -100,6 +102,7 @@ class MCPServiceManager:
                 "task": task,
                 "port": port,
                 "host": service.streamhttp_host,
+                "base_path": f"/{service.name}",
                 "started_at": datetime.now(),
                 "stdio_params": stdio_params,
                 "mcp_settings": mcp_settings
@@ -108,8 +111,8 @@ class MCPServiceManager:
             self.running_services[service.id] = service_info
             
             # 创建代理实例记录
-            sse_url = f"http://{service.streamhttp_host}:{port}/sse"
-            streamhttp_url = f"http://{service.streamhttp_host}:{port}/mcp"
+            sse_url = f"http://{service.streamhttp_host}:{port}/{service.name}/sse"
+            streamhttp_url = f"http://{service.streamhttp_host}:{port}/{service.name}/mcp"
             
             proxy_instance_crud.create(
                 db=db,
@@ -127,7 +130,7 @@ class MCPServiceManager:
             service.streamhttp_port = port
             service_crud.update_status(db, service.id, ServiceStatus.ACTIVE, f"服务已启动，端口: {port}")
             
-            logger.info(f"Service {service.name} started on port {port}")
+            logger.info(f"Service {service.name} started on port {port} at path /{service.name}")
             return True, f"服务已成功启动，端口: {port}"
             
         except Exception as e:
@@ -207,8 +210,8 @@ class MCPServiceManager:
             "port": service_info["port"],
             "host": service_info["host"],
             "started_at": service_info["started_at"],
-            "sse_url": f"http://{service_info['host']}:{service_info['port']}/sse",
-            "streamhttp_url": f"http://{service_info['host']}:{service_info['port']}/mcp"
+            "sse_url": f"http://{service_info['host']}:{service_info['port']}{service_info.get('base_path','')}/sse",
+            "streamhttp_url": f"http://{service_info['host']}:{service_info['port']}{service_info.get('base_path','')}/mcp"
         }
     
     def get_all_running_services(self) -> Dict[int, Dict]:
@@ -219,8 +222,8 @@ class MCPServiceManager:
                 "port": service_info["port"],
                 "host": service_info["host"],
                 "started_at": service_info["started_at"],
-                "sse_url": f"http://{service_info['host']}:{service_info['port']}/sse",
-                "streamhttp_url": f"http://{service_info['host']}:{service_info['port']}/mcp"
+                "sse_url": f"http://{service_info['host']}:{service_info['port']}{service_info.get('base_path','')}/sse",
+                "streamhttp_url": f"http://{service_info['host']}:{service_info['port']}{service_info.get('base_path','')}/mcp"
             }
         return result
     

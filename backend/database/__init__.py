@@ -60,12 +60,12 @@ def init_database():
                 ),
                 SystemSettings(
                     key="port_range_start",
-                    value=8000,
+                    value=10000,
                     description="端口分配起始范围"
                 ),
                 SystemSettings(
                     key="port_range_end",
-                    value=9000,
+                    value=19999,
                     description="端口分配结束范围"
                 ),
                 SystemSettings(
