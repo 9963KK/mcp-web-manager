@@ -58,6 +58,15 @@ class PortManager:
             except OSError:
                 return False
 
+    def try_allocate_specific(self, port: int) -> bool:
+        """尝试分配指定端口，成功返回 True。"""
+        if port in self.allocated_ports:
+            return False
+        if not self._is_port_available(port):
+            return False
+        self.allocated_ports.add(port)
+        return True
+
 
 class MCPServiceManager:
     """MCP服务管理器."""
@@ -73,8 +82,19 @@ class MCPServiceManager:
             if service.id in self.running_services:
                 return False, "服务已在运行中"
             
-            # 分配端口
-            port = self.port_manager.allocate_port()
+            # 分配端口：优先尝试复用上次端口，最多等待 ~3s
+            desired_port = service.streamhttp_port
+            port: Optional[int] = None
+            if desired_port and self.port_manager.start_port <= desired_port <= self.port_manager.end_port:
+                for _ in range(15):  # 15 * 0.2s = 3s
+                    if self.port_manager.try_allocate_specific(desired_port):
+                        port = desired_port
+                        logger.info("Reusing previous port for service %s: %s", service.name, port)
+                        break
+                    await asyncio.sleep(0.2)
+            # 回退选择任意可用端口
+            if port is None:
+                port = self.port_manager.allocate_port()
             if not port:
                 return False, "无法分配可用端口"
             
