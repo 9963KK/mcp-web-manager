@@ -422,6 +422,7 @@
                                 <button class="btn btn-sm" onclick="manageService(${service.id}, '${service.status}')">
                                     ${service.status === 'active' ? '停止' : '启动'}
                                 </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteService(${service.id}, '${service.name.replace(/'/g, "\\'")}')">删除</button>
                             </div>
                         </li>
                     `).join('')}
@@ -429,6 +430,24 @@
             `;
             
             list.innerHTML = html;
+        }
+        
+        // 删除服务
+        async function deleteService(serviceId, name) {
+            if (!confirm(`确定要删除服务 “${name}” 吗？`)) return;
+            try {
+                const response = await fetch(`/api/services/${serviceId}`, { method: 'DELETE' });
+                const result = await response.json().catch(() => ({}));
+                if (response.ok) {
+                    alert(result.message || '服务已删除');
+                    loadServices();
+                    loadStats();
+                } else {
+                    alert('删除失败: ' + (result.detail || '未知错误'));
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
         }
         
         // 更新统计信息
