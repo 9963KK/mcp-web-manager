@@ -1,0 +1,57 @@
+[project]
+name = "mcp-web-manager"
+description = "A web-based management interface for MCP proxy services with stdio to streamhttp conversion"
+authors = [{ name = "MCP Web Manager Team" }]
+license = { file = "LICENSE" }
+readme = "README.md"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.12.0",
+    "pydantic>=2.0.0",
+    "websockets>=12.0",
+    "aiofiles>=23.2.0",
+    "python-multipart>=0.0.6",
+    "mcp>=1.8.0,<2.0.0"
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+
+[project.urls]
+Homepage = "https://github.com/mcp-web-manager/mcp-web-manager"
+Source = "https://github.com/mcp-web-manager/mcp-web-manager"
+
+[project.scripts]
+mcp-web-manager = "main:app"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.21.0",
+    "coverage>=7.0.0",
+    "mypy>=1.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "ARG", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
