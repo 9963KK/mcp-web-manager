@@ -88,17 +88,16 @@
         }
         .btn-secondary { background: #6c757d; }
         
-        .service-list {
-            list-style: none;
-        }
-        
-        .service-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
-            border-bottom: 1px solid #eee;
-        }
+        .service-list { list-style: none; }
+        .accordion-item { border: 1px solid #eee; border-radius: 10px; margin-bottom: 12px; overflow: hidden; background: #fff; }
+        .accordion-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; background: #f8f9fb; }
+        .header-left { display: flex; align-items: center; gap: 10px; }
+        .header-left small { color: #666; }
+        .header-right { display: flex; align-items: center; gap: 8px; }
+        .chevron { display:inline-block; transition: transform .2s ease; color:#8792a2; }
+        .accordion-item.open .chevron { transform: rotate(90deg); }
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height .25s ease; background: #fff; }
+        .content-inner { padding: 12px 16px 14px 42px; }
         
         .service-status {
             padding: 0.25rem 0.75rem;
@@ -411,27 +410,28 @@
             const html = `
                 <ul class="service-list">
                     ${services.map(service => `
-                        <li class="service-item">
-                            <div>
-                                <strong style="cursor:pointer" onclick="toggleServiceDetails(${service.id})" title="点击展开配置">${service.name}</strong>
-                                <br>
-                                <small>${service.description || '无描述'}</small>
+                        <li class="accordion-item" id="item-${service.id}">
+                            <div class="accordion-header" onclick="toggleServiceDetails(${service.id})">
+                                <div class="header-left">
+                                    <span class="chevron">▸</span>
+                                    <div>
+                                        <strong>${service.name}</strong><br>
+                                        <small>${service.description || '无描述'}</small>
+                                    </div>
+                                </div>
+                                <div class="header-right" onclick="event.stopPropagation();">
+                                    <span class="service-status status-${service.status}">${getStatusText(service.status)}</span>
+                                    <button class="btn btn-sm" onclick="manageService(${service.id}, '${service.status}')">${service.status === 'active' ? '停止' : '启动'}</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteService(${service.id}, '${service.name.replace(/'/g, "\\'")}')">删除</button>
+                                </div>
                             </div>
-                            <div>
-                                <span class="service-status status-${service.status}">
-                                    ${getStatusText(service.status)}
-                                </span>
-                                <button class="btn btn-sm" onclick="manageService(${service.id}, '${service.status}')">
-                                    ${service.status === 'active' ? '停止' : '启动'}
-                                </button>
-                                <button class="btn btn-sm btn-danger" onclick="deleteService(${service.id}, '${service.name.replace(/'/g, "\\'")}')">删除</button>
-                            </div>
-                            <div class="details-box" id="svc-${service.id}" style="display:none">
-                                <div>
+                            <div class="accordion-content" id="svc-${service.id}">
+                                <div class="content-inner">
                                     <div><strong>StreamHTTP:</strong> <code id="url-${service.id}">加载中...</code> <button class="btn inline-btn btn-secondary" onclick="copyServiceUrl(${service.id})">复制</button></div>
-                                    <div style="margin-top:8px;">
+                                    <div style="margin-top:10px;"><strong>SSE:</strong> <code id="sse-${service.id}">加载中...</code> <button class="btn inline-btn btn-secondary" onclick="copySse(${service.id})">复制</button></div>
+                                    <div style="margin-top:12px;">
                                         <strong>Claude Desktop 片段:</strong>
-                                        <pre class="code-block" id="claude-${service.id}">加载中...</pre>
+                                        <pre class="code-block" style="max-height: 180px; overflow: auto;" id="claude-${service.id}">加载中...</pre>
                                         <button class="btn inline-btn btn-secondary" onclick="copyClaude(${service.id})">复制</button>
                                     </div>
                                 </div>
@@ -450,19 +450,24 @@
 
         // 切换展开详情
         async function toggleServiceDetails(serviceId) {
+            const container = document.getElementById(`item-${serviceId}`);
             const box = document.getElementById(`svc-${serviceId}`);
-            if (!box) return;
-            if (box.style.display === 'block') { box.style.display = 'none'; return; }
+            if (!box || !container) return;
+            const isOpen = container.classList.contains('open');
+            if (isOpen) {
+                box.style.maxHeight = '0px';
+                container.classList.remove('open');
+                return;
+            }
             try {
                 // 缓存服务基本信息
-                if (!servicesCache[serviceId]) {
-                    // 从当前列表 DOM 里找不到直接对象，这里依赖最近一次 loadServices 缓存
-                }
+                // servicesCache 由 loadServices 更新
                 // 加载配置
                 const cfg = await ensureServiceConfig(serviceId);
                 const streamUrl = (cfg && cfg.urls && cfg.urls.streamhttp) ? cfg.urls.streamhttp : '';
                 const sseUrl = (cfg && cfg.urls && cfg.urls.sse) ? cfg.urls.sse : '';
                 document.getElementById(`url-${serviceId}`).textContent = streamUrl || '未获取到URL';
+                document.getElementById(`sse-${serviceId}`).textContent = sseUrl || (streamUrl ? streamUrl.replace('/mcp','/sse') : '未获取到URL');
                 const name = cfg && cfg.service_name ? cfg.service_name : (servicesCache[serviceId]?.name || `service-${serviceId}`);
                 const env = (cfg && cfg.config && cfg.config.env) ? cfg.config.env : (servicesCache[serviceId]?.env_vars || {});
                 const snippetObj = { mcpServers: { [name]: { command: 'mcp-proxy', args: [ sseUrl || streamUrl.replace('/mcp','/sse') ], ...(env && Object.keys(env).length ? { env } : {}) } } };
@@ -471,7 +476,9 @@
                 document.getElementById(`url-${serviceId}`).textContent = '获取失败';
                 document.getElementById(`claude-${serviceId}`).textContent = String(e);
             }
-            box.style.display = 'block';
+            // 展开动画
+            container.classList.add('open');
+            box.style.maxHeight = box.scrollHeight + 'px';
         }
 
         async function ensureServiceConfig(serviceId) {
@@ -491,6 +498,12 @@
             const el = document.getElementById(`claude-${serviceId}`);
             if (!el) return;
             navigator.clipboard.writeText(el.textContent || '').then(() => alert('已复制 Claude 配置片段')).catch(() => alert('复制失败'));
+        }
+
+        function copySse(serviceId) {
+            const el = document.getElementById(`sse-${serviceId}`);
+            if (!el) return;
+            navigator.clipboard.writeText(el.textContent || '').then(() => alert('已复制 SSE 地址')).catch(() => alert('复制失败'));
         }
         
         // 删除服务
