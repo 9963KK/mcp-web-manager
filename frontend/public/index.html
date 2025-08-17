@@ -381,6 +381,10 @@
             try {
                 const response = await fetch('/api/services/');
                 const data = await response.json();
+                // 缓存服务基础数据
+                if (data && Array.isArray(data.services)) {
+                    data.services.forEach(s => { servicesCache[s.id] = s; });
+                }
                 displayServices(data.services);
             } catch (error) {
                 document.getElementById('servicesList').innerHTML = '❌ 加载服务列表失败';
@@ -466,11 +470,13 @@
                 const cfg = await ensureServiceConfig(serviceId);
                 const streamUrl = (cfg && cfg.urls && cfg.urls.streamhttp) ? cfg.urls.streamhttp : '';
                 const sseUrl = (cfg && cfg.urls && cfg.urls.sse) ? cfg.urls.sse : '';
-                document.getElementById(`url-${serviceId}`).textContent = streamUrl || '未获取到URL';
-                document.getElementById(`sse-${serviceId}`).textContent = sseUrl || (streamUrl ? streamUrl.replace('/mcp','/sse') : '未获取到URL');
+                const displayStream = rewriteHost(streamUrl);
+                const displaySse = rewriteHost(sseUrl || (streamUrl ? streamUrl.replace('/mcp','/sse') : ''));
+                document.getElementById(`url-${serviceId}`).textContent = displayStream || '未获取到URL';
+                document.getElementById(`sse-${serviceId}`).textContent = displaySse || '未获取到URL';
                 const name = cfg && cfg.service_name ? cfg.service_name : (servicesCache[serviceId]?.name || `service-${serviceId}`);
                 const env = (cfg && cfg.config && cfg.config.env) ? cfg.config.env : (servicesCache[serviceId]?.env_vars || {});
-                const snippetObj = { mcpServers: { [name]: { command: 'mcp-proxy', args: [ sseUrl || streamUrl.replace('/mcp','/sse') ], ...(env && Object.keys(env).length ? { env } : {}) } } };
+                const snippetObj = { mcpServers: { [name]: { command: 'mcp-proxy', args: [ displaySse || displayStream.replace('/mcp','/sse') ], ...(env && Object.keys(env).length ? { env } : {}) } } };
                 document.getElementById(`claude-${serviceId}`).textContent = JSON.stringify(snippetObj, null, 2);
             } catch (e) {
                 document.getElementById(`url-${serviceId}`).textContent = '获取失败';
@@ -504,6 +510,18 @@
             const el = document.getElementById(`sse-${serviceId}`);
             if (!el) return;
             navigator.clipboard.writeText(el.textContent || '').then(() => alert('已复制 SSE 地址')).catch(() => alert('复制失败'));
+        }
+
+        // 将 URL 的主机名替换为当前站点的主机，避免复制到 127.0.0.1 导致外网不可访问
+        function rewriteHost(url) {
+            if (!url) return url;
+            try {
+                const u = new URL(url);
+                u.hostname = location.hostname;
+                return u.toString();
+            } catch (_) {
+                return url;
+            }
         }
         
         // 删除服务
