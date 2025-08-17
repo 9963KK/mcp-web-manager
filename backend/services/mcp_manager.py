@@ -48,11 +48,12 @@ class PortManager:
         self.allocated_ports.discard(port)
     
     def _is_port_available(self, port: int) -> bool:
-        """检查端口是否可用."""
+        """检查端口是否可用 (对 0.0.0.0 进行绑定更贴近实际监听)."""
         import socket
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
-                sock.bind(("127.0.0.1", port))
+                sock.bind(("0.0.0.0", port))
                 return True
             except OSError:
                 return False
@@ -188,8 +189,9 @@ class MCPServiceManager:
             except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
             
-            # 释放端口
+            # 等待端口真正释放后再释放记录，避免立即重启时判定占用
             port = service_info["port"]
+            await self._wait_port_closed(port, timeout=8.0)
             self.port_manager.release_port(port)
             
             # 更新代理实例状态
@@ -227,6 +229,20 @@ class MCPServiceManager:
                 asyncio.create_task(broadcaster.service_error(service_id, service.name, str(e)))
             
             return False, f"停止失败: {str(e)}"
+
+    async def _wait_port_closed(self, port: int, timeout: float = 8.0) -> None:
+        """等待直到端口关闭或超时 (轮询 0.2s)."""
+        start = asyncio.get_event_loop().time()
+        while True:
+            try:
+                if self.port_manager._is_port_available(port):  # noqa: SLF001
+                    return
+            except Exception:
+                return
+            if asyncio.get_event_loop().time() - start > timeout:
+                logger.warning("Port %s still busy after %.1fs; next start may allocate a new port", port, timeout)
+                return
+            await asyncio.sleep(0.2)
     
     async def restart_service(self, db, service: MCPService) -> Tuple[bool, str]:
         """重启MCP服务."""

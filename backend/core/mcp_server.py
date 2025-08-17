@@ -92,7 +92,7 @@ def create_single_instance_routes(
         method = scope.get("method")
         if method and method.upper() != "POST":
             response = PlainTextResponse(
-                "Method Not Allowed. Use POST to /mcp/ for Streamable HTTP.", status_code=405
+                "Method Not Allowed. Use POST to /mcp or /mcp/ for Streamable HTTP.", status_code=405
             )
             await response(scope, receive, send)
             return
