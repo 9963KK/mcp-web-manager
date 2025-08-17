@@ -16,7 +16,6 @@ from schemas import (
     ProxyInstanceResponse,
     BatchCreateServicesRequest,
     ImportResultResponse,
-    ClaudeDesktopConfig,
 )
 from services.mcp_manager import mcp_service_manager
 
@@ -234,17 +233,32 @@ async def import_services(
             parsed = BatchCreateServicesRequest(**payload)
             services_list = parsed.services
 
-        # 情况2: Claude Desktop 结构
-        elif isinstance(payload, dict) and "mcpServers" in payload:
-            claude_cfg = ClaudeDesktopConfig(**payload)
-            for name, cfg in claude_cfg.mcpServers.items():
+        # 情况2: mcp-proxy/Claude Desktop 常见结构 { mcpServers: { name: { command, args, env, ... } } }
+        elif isinstance(payload, dict) and "mcpServers" in payload and isinstance(payload["mcpServers"], dict):
+            for name, raw_cfg in payload["mcpServers"].items():
+                if not isinstance(raw_cfg, dict):
+                    continue
+                # 兼容 enabled/disabled 两种写法
+                if raw_cfg.get("enabled") is False:
+                    continue
+                if raw_cfg.get("disabled") is True:
+                    continue
+
+                command = raw_cfg.get("command")
+                args = raw_cfg.get("args") or []
+                env = raw_cfg.get("env") or raw_cfg.get("environment") or {}
+                cwd = raw_cfg.get("cwd")
+                if not command:
+                    # 有些配置可能把整条命令放在 args 的第一个元素中（不符合规范），忽略
+                    continue
                 services_list.append(
                     MCPServiceCreate(
                         name=name,
-                        description=f"Imported from Claude config: {name}",
-                        command=cfg.command,
-                        args=cfg.args or [],
-                        env_vars=cfg.env or {},
+                        description=f"Imported from mcpServers: {name}",
+                        command=command,
+                        args=args,
+                        env_vars=env,
+                        working_directory=cwd,
                     )
                 )
         else:

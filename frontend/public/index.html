@@ -284,9 +284,8 @@
 
             // 优先尝试后端批量导入接口
             try {
-                const importBody = (original && typeof original === 'object' && !Array.isArray(original) && (original.mcpServers || original.services))
-                    ? original
-                    : { services: items };
+                // 优先直接把原始结构交给后端（它会兼容 mcpServers / services / 单对象）
+                const importBody = (original && typeof original === 'object') ? original : { services: items };
                 const resp = await fetch('/api/services/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(importBody) });
                 if (resp.ok) {
                     const result = await resp.json();
