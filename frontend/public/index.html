@@ -347,7 +347,12 @@
         // 连接WebSocket
         function connectWebSocket() {
             try {
-                ws = new WebSocket('ws://localhost:8080/ws');
+                // 动态构建WebSocket URL，使用当前页面的主机名和端口
+                const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${location.host}/ws`;
+                console.log('连接WebSocket:', wsUrl);
+                
+                ws = new WebSocket(wsUrl);
                 
                 ws.onopen = function() {
                     updateStatus('wsStatus', true, 'WebSocket已连接');

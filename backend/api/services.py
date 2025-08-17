@@ -170,7 +170,9 @@ async def get_service_status(service_id: int, db: Session = Depends(get_db)):
         "service_id": service_id,
         "name": service.name,
         "status": service.status,
-        "runtime": runtime_status
+        "runtime": runtime_status,
+        "database_status": service.status,
+        "manager_has_service": service_id in mcp_service_manager.running_services
     }
 
 

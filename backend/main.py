@@ -32,11 +32,35 @@ async def lifespan(app: FastAPI):
     init_database()
     logger.info("Database initialized")
     
+    # 同步服务状态 - 重启后将所有数据库中标记为运行的服务状态重置为 inactive
+    from database import SessionLocal
+    from database.crud import service_crud
+    from models import ServiceStatus, MCPService
+    
+    db = SessionLocal()
+    try:
+        # 获取所有标记为运行或启动中的服务
+        active_services = db.query(MCPService).filter(
+            MCPService.status.in_([ServiceStatus.ACTIVE.value, ServiceStatus.STARTING.value])
+        ).all()
+        
+        if active_services:
+            logger.info(f"Found {len(active_services)} services in active/starting state, resetting to inactive...")
+            for service in active_services:
+                service_crud.update_status(db, service.id, ServiceStatus.INACTIVE, "服务重启后状态重置")
+            logger.info("Service status synchronized")
+        else:
+            logger.info("No active services found, status already synchronized")
+            
+    except Exception as e:
+        logger.error(f"Error synchronizing service status: {e}")
+    finally:
+        db.close()
+    
     yield
     
     # 关闭时清理
     logger.info("Shutting down MCP Web Manager...")
-    from database import SessionLocal
     db = SessionLocal()
     try:
         await mcp_service_manager.cleanup_all(db)

@@ -16,6 +16,16 @@ from database.crud import service_crud, proxy_instance_crud, status_log_crud
 
 logger = logging.getLogger(__name__)
 
+# 延迟导入避免循环导入
+def get_event_broadcaster():
+    """获取事件广播器实例 - 延迟导入避免循环依赖."""
+    try:
+        from websocket.handlers import event_broadcaster
+        return event_broadcaster
+    except ImportError:
+        logger.warning("WebSocket event broadcaster not available")
+        return None
+
 
 class PortManager:
     """端口分配管理器."""
@@ -133,6 +143,11 @@ class MCPServiceManager:
             service.streamhttp_port = port
             service_crud.update_status(db, service.id, ServiceStatus.ACTIVE, f"服务已启动，端口: {port}")
             
+            # 广播服务启动事件
+            broadcaster = get_event_broadcaster()
+            if broadcaster:
+                asyncio.create_task(broadcaster.service_started(service.id, service.name, port))
+            
             logger.info(f"Service {service.name} started on port {port} at path /{service.name}")
             return True, f"服务已成功启动，端口: {port}"
             
@@ -145,6 +160,12 @@ class MCPServiceManager:
                 del self.running_services[service.id]
             
             service_crud.update_status(db, service.id, ServiceStatus.ERROR, f"启动失败: {str(e)}")
+            
+            # 广播服务错误事件
+            broadcaster = get_event_broadcaster()
+            if broadcaster:
+                asyncio.create_task(broadcaster.service_error(service.id, service.name, str(e)))
+            
             return False, f"启动失败: {str(e)}"
     
     async def stop_service(self, db, service_id: int) -> Tuple[bool, str]:
@@ -182,12 +203,29 @@ class MCPServiceManager:
             # 更新服务状态
             service_crud.update_status(db, service_id, ServiceStatus.INACTIVE, "服务已停止")
             
+            # 获取服务信息用于广播
+            service = service_crud.get_by_id(db, service_id)
+            
+            # 广播服务停止事件
+            broadcaster = get_event_broadcaster()
+            if broadcaster and service:
+                asyncio.create_task(broadcaster.service_stopped(service_id, service.name))
+            
             logger.info(f"Service {service_id} stopped")
             return True, "服务已成功停止"
             
         except Exception as e:
             logger.error(f"Failed to stop service {service_id}: {e}")
             service_crud.update_status(db, service_id, ServiceStatus.ERROR, f"停止失败: {str(e)}")
+            
+            # 获取服务信息用于广播
+            service = service_crud.get_by_id(db, service_id)
+            
+            # 广播服务错误事件
+            broadcaster = get_event_broadcaster()
+            if broadcaster and service:
+                asyncio.create_task(broadcaster.service_error(service_id, service.name, str(e)))
+            
             return False, f"停止失败: {str(e)}"
     
     async def restart_service(self, db, service: MCPService) -> Tuple[bool, str]:
