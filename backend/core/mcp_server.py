@@ -98,12 +98,10 @@ def create_single_instance_routes(
             return
         await http_session_manager.handle_request(scope, receive, send)
 
-    async def redirect_mcp(_: Request) -> Response:
-        # 将 /mcp 重定向到 /mcp/，保留方法（307）避免部分客户端不规范的路径问题
-        return RedirectResponse(url="/mcp/", status_code=307)
 
     routes = [
-        Route("/mcp", endpoint=redirect_mcp),
+        # 同时挂载 /mcp 与 /mcp/，确保客户端无论是否带尾斜杠都可 POST 成功
+        Mount("/mcp", app=handle_streamable_http_instance),
         Mount("/mcp/", app=handle_streamable_http_instance),
         Route("/sse", endpoint=handle_sse_instance),
         Mount("/messages/", app=sse_transport.handle_post_message),
