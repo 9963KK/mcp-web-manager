@@ -431,12 +431,12 @@
                             </div>
                             <div class="accordion-content" id="svc-${service.id}">
                                 <div class="content-inner">
-                                    <div><strong>StreamHTTP:</strong> <code id="url-${service.id}">加载中...</code> <button class="btn inline-btn btn-secondary" onclick="copyServiceUrl(${service.id})">复制</button></div>
-                                    <div style="margin-top:10px;"><strong>SSE:</strong> <code id="sse-${service.id}">加载中...</code> <button class="btn inline-btn btn-secondary" onclick="copySse(${service.id})">复制</button></div>
+                                    <div><strong>StreamHTTP:</strong> <code id="url-${service.id}">加载中...</code> <button class="btn inline-btn btn-secondary" onclick="copyServiceUrl(${service.id}, event)">复制</button></div>
+                                    <div style="margin-top:10px;"><strong>SSE:</strong> <code id="sse-${service.id}">加载中...</code> <button class="btn inline-btn btn-secondary" onclick="copySse(${service.id}, event)">复制</button></div>
                                     <div style="margin-top:12px;">
                                         <strong>Claude Desktop 片段:</strong>
                                         <pre class="code-block" style="max-height: 180px; overflow: auto;" id="claude-${service.id}">加载中...</pre>
-                                        <button class="btn inline-btn btn-secondary" onclick="copyClaude(${service.id})">复制</button>
+                                        <button class="btn inline-btn btn-secondary" onclick="copyClaude(${service.id}, event)">复制</button>
                                     </div>
                                 </div>
                             </div>
@@ -495,21 +495,47 @@
             return data;
         }
 
-        function copyServiceUrl(serviceId) {
+        async function copyServiceUrl(serviceId, e) {
+            e && e.stopPropagation();
             const el = document.getElementById(`url-${serviceId}`);
             if (!el) return;
-            navigator.clipboard.writeText(el.textContent || '').then(() => alert('已复制 StreamHTTP 地址')).catch(() => alert('复制失败'));
+            await safeCopy(el.textContent || '');
         }
-        function copyClaude(serviceId) {
+        async function copyClaude(serviceId, e) {
+            e && e.stopPropagation();
             const el = document.getElementById(`claude-${serviceId}`);
             if (!el) return;
-            navigator.clipboard.writeText(el.textContent || '').then(() => alert('已复制 Claude 配置片段')).catch(() => alert('复制失败'));
+            await safeCopy(el.textContent || '');
         }
 
-        function copySse(serviceId) {
+        async function copySse(serviceId, e) {
+            e && e.stopPropagation();
             const el = document.getElementById(`sse-${serviceId}`);
             if (!el) return;
-            navigator.clipboard.writeText(el.textContent || '').then(() => alert('已复制 SSE 地址')).catch(() => alert('复制失败'));
+            await safeCopy(el.textContent || '');
+        }
+
+        async function safeCopy(text) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                    alert('已复制到剪贴板');
+                } else {
+                    // 兼容非安全上下文（http）或Clipboard API不可用
+                    const tmp = document.createElement('textarea');
+                    tmp.value = text;
+                    tmp.style.position = 'fixed';
+                    tmp.style.left = '-9999px';
+                    document.body.appendChild(tmp);
+                    tmp.focus();
+                    tmp.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tmp);
+                    alert('已复制到剪贴板');
+                }
+            } catch (err) {
+                alert('复制失败: ' + (err && err.message ? err.message : String(err)));
+            }
         }
 
         // 将 URL 的主机名替换为当前站点的主机，避免复制到 127.0.0.1 导致外网不可访问

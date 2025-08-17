@@ -79,8 +79,11 @@ class MCPServiceManager:
             )
             
             # 创建MCP服务器设置
+            bind_host = (
+                service.streamhttp_host if service.streamhttp_host not in ("127.0.0.1", "localhost") else "0.0.0.0"
+            )
             mcp_settings = MCPServerSettings(
-                bind_host=service.streamhttp_host or "0.0.0.0",
+                bind_host=bind_host,
                 port=port,
                 stateless=False,
                 allow_origins=["*"],  # 开发环境允许所有来源
@@ -101,7 +104,7 @@ class MCPServiceManager:
             service_info = {
                 "task": task,
                 "port": port,
-                "host": service.streamhttp_host,
+                "host": bind_host,
                 "base_path": f"/{service.name}",
                 "started_at": datetime.now(),
                 "stdio_params": stdio_params,
