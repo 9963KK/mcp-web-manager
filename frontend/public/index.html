@@ -203,30 +203,8 @@
                 <div class="modal-title" id="jsonModalTitle">使用 JSON 添加 MCP 服务</div>
             </div>
             <div class="modal-body">
-                <p class="help-text">支持 <strong>通用 MCP 配置</strong> 与 <strong>内部批量/单对象</strong> 三种格式（会自动识别）：</p>
+                <p class="help-text">支持 <strong>多种 JSON 格式</strong>（mcpServers / services 数组 / 单对象），系统会自动识别。下面仅示例最常用的<strong>单对象</strong>格式：</p>
 
-                <p class="help-text"><strong>1) 通用：Claude Desktop / mcp-proxy 的 mcpServers</strong></p>
-                <pre class="help-text" style="white-space: pre-wrap; background:#fafafa; border:1px solid #eee; padding:8px; border-radius:6px;">{
-  "mcpServers": {
-    "fetch": {
-      "enabled": true,
-      "command": "uvx",
-      "args": ["mcp-server-fetch"],
-      "env": { "API_KEY": "xxxxx" },
-      "cwd": "/root"
-    }
-  }
-}</pre>
-
-                <p class="help-text"><strong>2) 标准批量：services 数组</strong></p>
-                <pre class="help-text" style="white-space: pre-wrap; background:#fafafa; border:1px solid #eee; padding:8px; border-radius:6px;">{
-  "services": [
-    { "name": "a", "command": "uvx", "args": ["mcp-server-a"] },
-    { "name": "b", "command": "uvx", "args": ["mcp-server-b"], "env_vars": {"FLAG": "1"} }
-  ]
-}</pre>
-
-                <p class="help-text"><strong>3) 单对象：等同创建一个服务</strong></p>
                 <pre class="help-text" style="white-space: pre-wrap; background:#fafafa; border:1px solid #eee; padding:8px; border-radius:6px;">{
   "name": "fetch",
   "description": "示例 stdio 服务",
@@ -239,7 +217,7 @@
   "timeout": 60
 }</pre>
 
-                <textarea id="jsonInput" class="textarea" placeholder='粘贴 JSON 到这里，优先按通用 mcpServers 结构解析；也可使用 {services:[...]} 或单对象'></textarea>
+                <textarea id="jsonInput" class="textarea" placeholder='粘贴 JSON 到这里，系统会自动识别 mcpServers / services / 单对象'></textarea>
             </div>
             <div class="modal-footer">
                 <button class="btn inline-btn btn-secondary" onclick="closeJsonModal(); addService()">跳过至手动配置</button>
