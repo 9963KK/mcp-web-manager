@@ -140,7 +140,17 @@ async def service_action(
     message = ""
     
     if action.action == "start":
-        success, message = await mcp_service_manager.start_service(db, service)
+        # 异步后台启动，快速响应，与停止保持一致
+        async def _start_in_background(svc_id: int):
+            local_db = SessionLocal()
+            try:
+                svc = service_crud.get_by_id(local_db, svc_id)
+                if svc:
+                    await mcp_service_manager.start_service(local_db, svc)
+            finally:
+                local_db.close()
+        asyncio.create_task(_start_in_background(service_id))
+        success, message = True, "启动指令已发送，正在启动..."
     elif action.action == "stop":
         # 异步后台停止，快速响应
         async def _stop_in_background(svc_id: int):
@@ -154,7 +164,7 @@ async def service_action(
         success, message = True, "停止指令已发送，正在停止..."
     elif action.action == "restart":
         success, message = await mcp_service_manager.restart_service(db, service)
-    
+
     if success:
         return {"message": message}
     else:

@@ -1,0 +1,23 @@
+{
+  "currentState": "service_discovery",
+  "stateHistory": [
+    {
+      "from": "initial",
+      "command": "init",
+      "timestamp": "2025-08-18T09:12:59.611Z",
+      "args": [
+        {
+          "workingDirectory": "/root/mcp-web-manager",
+          "ideType": "vscode"
+        }
+      ]
+    },
+    {
+      "from": "initialized",
+      "command": "welcome",
+      "timestamp": "2025-08-18T09:13:07.076Z",
+      "args": []
+    }
+  ],
+  "lastUpdated": "2025-08-18T09:13:07.089Z"
+}

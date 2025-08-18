@@ -98,6 +98,15 @@
         .chevron { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; transition: transform .2s ease, background-color .2s ease; color:#8792a2; border-radius:6px; }
         .chevron svg { width:16px; height:16px; fill:#8792a2; }
         .accordion-header:hover .chevron { background:#eef1f6; }
+        <style>
+            .btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+            .spinner {
+                display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%;
+                animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px;
+            }
+            @keyframes spin { to { transform: rotate(360deg); } }
+        </style>
+
         .accordion-item.open .chevron { transform: rotate(90deg); }
         .accordion-content { max-height: 0; overflow: hidden; transition: max-height .25s ease; background: #fff; }
         .svc-title { font-size: 16px; font-weight: 700; color: #3b3f5c; }
@@ -439,7 +448,7 @@
                                 </div>
                                 <div class="header-right" onclick="event.stopPropagation();">
                                     <span class="service-status status-${service.status}"><span class="dot"></span>${getStatusText(service.status)}</span>
-                                    <button class="btn btn-sm" onclick="manageService(${service.id}, '${service.status}')">${service.status === 'active' ? '停止' : '启动'}</button>
+                                    <button class="btn btn-sm" id="btn-${service.id}" onclick="manageService(${service.id}, '${service.status}', event)">${service.status === 'active' ? '停止' : '启动'}</button>
                                     <button class="btn btn-sm btn-danger" onclick="deleteService(${service.id}, '${service.name.replace(/'/g, "\\'")}')">删除</button>
                                 </div>
                             </div>
@@ -652,9 +661,13 @@
             loadStats(); // 重新加载统计信息
         }
 
-        // 管理服务
-        async function manageService(serviceId, currentStatus) {
+        // 管理服务（按钮级加载动画 + 后端异步指令）
+        async function manageService(serviceId, currentStatus, evt) {
             const action = currentStatus === 'active' ? 'stop' : 'start';
+            const btn = document.getElementById(`btn-${serviceId}`);
+            const originalText = btn ? btn.textContent : '';
+            const loadingText = action === 'stop' ? '停止中…' : '启动中…';
+            if (btn) { btn.disabled = true; btn.textContent = loadingText; }
 
             try {
                 const response = await fetch(`/api/services/${serviceId}/action`, {
@@ -668,14 +681,16 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    alert(result.message);
-                    loadServices();
-                    loadStats();
+                    // 后端已改为异步执行，前端不等待，提示并短暂轮询刷新
+                    console.log(result.message);
+                    setTimeout(() => { loadServices(); loadStats(); }, 500);
                 } else {
                     alert('操作失败: ' + result.detail);
                 }
             } catch (error) {
                 alert('操作失败: ' + error.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = originalText; }
             }
         }
 
