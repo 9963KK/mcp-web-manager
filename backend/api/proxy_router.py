@@ -151,8 +151,51 @@ async def proxy_sse_messages(name: str, request: Request, path: str = "") -> Res
         resp = await client.post(url, headers=headers, content=body)
         return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
 
+# Root-level /messages proxy for clients that post to absolute '/messages/'
+@router.api_route("/messages/", methods=["POST"], include_in_schema=False)
+@router.api_route("/messages/{path:path}", methods=["POST"], include_in_schema=False)
+async def proxy_sse_messages_root(request: Request, path: str = "") -> Response:
+    from urllib.parse import parse_qs
+    qs = request.url.query
+    params = parse_qs(qs)
+    session_id = (params.get("session_id", [None])[0]) if qs else None
+    if not session_id:
+        return PlainTextResponse("Missing session_id", status_code=400)
 
-    return StreamingResponse(_event_stream(), media_type="text/event-stream")
+    # 1) Try cached mapping
+    target = SESSION_TARGETS.get(session_id)
+    headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
+    body = await request.body()
+    tail = f"/{path}" if path else ""
+
+    async def _forward_to(host: str, port: int) -> Response:
+        url = f"http://{host}:{port}/messages{tail}"
+        url = f"{url}?{qs}" if qs else url
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, headers=headers, content=body)
+            return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
+
+    if target:
+        resp = await _forward_to(target["host"], target["port"])
+        if resp.status_code < 400:
+            return resp
+        # fallback to probing
+
+    # 2) Probe all active instances
+    db = SessionLocal()
+    try:
+        instances = proxy_instance_crud.get_active(db)
+        for inst in instances:
+            host = getattr(inst, "host", "127.0.0.1")
+            port = inst.port
+            resp = await _forward_to(host, port)
+            if resp.status_code < 400:
+                SESSION_TARGETS[session_id] = {"host": host, "port": port}
+                return resp
+        return PlainTextResponse("Session not found on any active instance", status_code=404)
+    finally:
+        db.close()
+
 
 
 @router.api_route("/{name}/mcp", methods=["GET"], include_in_schema=False)
