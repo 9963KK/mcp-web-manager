@@ -87,7 +87,7 @@ class MCPServiceManager:
             desired_port = service.streamhttp_port
             port: Optional[int] = None
             if desired_port and self.port_manager.start_port <= desired_port <= self.port_manager.end_port:
-                for _ in range(15):  # 15 * 0.2s = 3s
+                for _ in range(4):  # 4 * 0.2s = 0.8s
                     if self.port_manager.try_allocate_specific(desired_port):
                         port = desired_port
                         logger.info("Reusing previous port for service %s: %s", service.name, port)
@@ -140,8 +140,8 @@ class MCPServiceManager:
                 stderr=subprocess.DEVNULL,
             )
 
-            # 等待端口开放
-            await self._wait_port_open("127.0.0.1", port, timeout=8.0)
+            # 等待端口开放（缩短超时至 3s）
+            await self._wait_port_open("127.0.0.1", port, timeout=3.0)
 
             # 记录运行信息
             service_info = {
@@ -224,16 +224,16 @@ class MCPServiceManager:
                 try:
                     process.terminate()
                     try:
-                        process.wait(timeout=6)
+                        process.wait(timeout=2)
                     except subprocess.TimeoutExpired:
                         process.kill()
-                        process.wait(timeout=3)
+                        process.wait(timeout=1)
                 except Exception as ex:  # noqa: BLE001
                     logger.warning("Error terminating process %s: %s", process.pid, ex)
             
             # 等待端口真正释放后再释放记录，避免立即重启时判定占用
             port = service_info["port"]
-            await self._wait_port_closed(port, timeout=8.0)
+            await self._wait_port_closed(port, timeout=2.0)
             self.port_manager.release_port(port)
             
             # 更新代理实例状态
