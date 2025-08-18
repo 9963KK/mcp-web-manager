@@ -204,19 +204,6 @@
             </div>
             <div class="modal-body">
                 <p class="help-text">推荐使用 <strong>mcpServers</strong> 结构（Claude Desktop / mcp-proxy 通用）。系统仍兼容 <em>services 数组/单对象</em> 的粘贴与解析。</p>
-
-                <pre class="help-text" style="white-space: pre-wrap; background:#fafafa; border:1px solid #eee; padding:8px; border-radius:6px;">{
-  "mcpServers": {
-    "fetch": {
-      "enabled": true,
-      "command": "uvx",
-      "args": ["mcp-server-fetch"],
-      "env": { "API_KEY": "xxxxx" },
-      "cwd": "/root"
-    }
-  }
-}</pre>
-
                 <textarea id="jsonInput" class="textarea" placeholder='粘贴 mcpServers JSON 到这里；也兼容 {services:[...]} 或单对象'></textarea>
             </div>
             <div class="modal-footer">
