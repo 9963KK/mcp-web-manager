@@ -487,6 +487,8 @@
                 document.getElementById(`claude-${serviceId}`).textContent = JSON.stringify(snippetObj, null, 2);
             } catch (e) {
                 document.getElementById(`url-${serviceId}`).textContent = '获取失败';
+                const sseEl = document.getElementById(`sse-${serviceId}`);
+                if (sseEl) sseEl.textContent = '获取失败';
                 document.getElementById(`claude-${serviceId}`).textContent = String(e);
             }
             // 展开动画
@@ -494,12 +496,27 @@
             box.style.maxHeight = box.scrollHeight + 'px';
         }
 
-        async function ensureServiceConfig(serviceId) {
-            if (serviceConfigs[serviceId]) return serviceConfigs[serviceId];
-            const resp = await fetch(`/api/config/export/service/${serviceId}`);
-            const data = await resp.json();
-            serviceConfigs[serviceId] = data;
-            return data;
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+        async function ensureServiceConfig(serviceId, opts = {}) {
+            const { retries = 6, waitMs = 400 } = opts;
+            const cached = serviceConfigs[serviceId];
+            if (cached && cached.urls && (cached.urls.streamhttp || cached.urls.sse)) return cached;
+            for (let i = 0; i <= retries; i++) {
+                try {
+                    const resp = await fetch(`/api/config/export/service/${serviceId}`);
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        if (data && data.urls && (data.urls.streamhttp || data.urls.sse)) {
+                            serviceConfigs[serviceId] = data;
+                            return data;
+                        }
+                    } else {
+                        try { await resp.json(); } catch (_) { /* ignore */ }
+                    }
+                } catch (_) { /* ignore and retry */ }
+                if (i < retries) await sleep(waitMs);
+            }
+            throw new Error('暂未获取到链接，请稍后重试');
         }
 
         async function copyServiceUrl(serviceId, e) {
