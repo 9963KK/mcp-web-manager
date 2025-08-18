@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from database import init_database
-from api import services_router, config_router, dashboard_router
+from api import services_router, config_router, dashboard_router, proxy_router
 from services.mcp_manager import mcp_service_manager
 from websocket import websocket_endpoint
 
@@ -95,7 +95,10 @@ def create_app() -> FastAPI:
     app.include_router(services_router)
     app.include_router(config_router)
     app.include_router(dashboard_router)
-    
+
+    # 统一域名下的反向代理：/{name}/mcp 与 /{name}/sse
+    app.include_router(proxy_router, tags=["proxy"])
+
     # 注册WebSocket端点
     app.websocket("/ws")(websocket_endpoint)
     
