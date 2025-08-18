@@ -130,16 +130,17 @@
             inset: 0;
             background: rgba(0,0,0,0.45);
             display: none;
-            align-items: center;
+            align-items: flex-start; /* 更靠上，减少遮挡 */
             justify-content: center;
+            padding: 5vh 12px; /* 顶部留白与两侧内边距 */
             z-index: 999;
         }
-        .modal { width: min(760px, 90vw); background: #fff; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; }
+        .modal { width: min(640px, 92vw); background: #fff; border-radius: 12px; border: 1px solid #eaeaea; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; }
         .modal-header { padding: 1rem 1.25rem; background: #f6f7fb; border-bottom: 1px solid #eee; }
         .modal-title { font-size: 1rem; font-weight: 600; }
-        .modal-body { padding: 1rem 1.25rem; }
-        .modal-footer { padding: 0.9rem 1.25rem 1.25rem 1.25rem; display: flex; gap: 0.75rem; justify-content: flex-end; }
-        .textarea { width: 100%; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 0.85rem; padding: 0.6rem 0.8rem; border: 1px solid #ddd; border-radius: 6px; outline: none; resize: vertical; }
+        .modal-body { padding: 1rem 1.25rem; max-height: 70vh; overflow: auto; }
+        .modal-footer { padding: 0.9rem 1.25rem 1.25rem 1.25rem; display: flex; gap: 0.75rem; justify-content: space-between; }
+        .textarea { width: 100%; min-height: 180px; max-height: 45vh; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 0.85rem; padding: 0.6rem 0.8rem; border: 1px solid #ddd; border-radius: 6px; outline: none; resize: vertical; }
         .textarea:focus { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.15); }
         .help-text { color: #666; font-size: 0.85rem; margin-bottom: 0.5rem; }
         .inline-btn { padding: 0.4rem 0.8rem; font-size: 0.9rem; }
@@ -241,8 +242,8 @@
                 <textarea id="jsonInput" class="textarea" placeholder='粘贴 JSON 到这里，优先按通用 mcpServers 结构解析；也可使用 {services:[...]} 或单对象'></textarea>
             </div>
             <div class="modal-footer">
-                <button class="btn inline-btn" onclick="closeJsonModal()">取消</button>
-                <button class="btn inline-btn btn-success" onclick="importServicesFromJson()">确定导入</button>
+                <button class="btn inline-btn btn-secondary" onclick="closeJsonModal(); addService()">跳过至手动配置</button>
+                <button class="btn inline-btn btn-success" onclick="importServicesFromJson()">解析并继续</button>
             </div>
         </div>
     </div>
