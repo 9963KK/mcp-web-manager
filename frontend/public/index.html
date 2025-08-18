@@ -95,7 +95,9 @@
         .header-left { display: flex; align-items: center; gap: 10px; }
         .header-left small { color: #666; }
         .header-right { display: flex; align-items: center; gap: 8px; }
-        .chevron { display:inline-block; transition: transform .2s ease; color:#8792a2; font-size: 18px; line-height: 1; }
+        .chevron { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; transition: transform .2s ease, background-color .2s ease; color:#8792a2; border-radius:6px; }
+        .chevron svg { width:16px; height:16px; fill:#8792a2; }
+        .accordion-header:hover .chevron { background:#eef1f6; }
         .accordion-item.open .chevron { transform: rotate(90deg); }
         .accordion-content { max-height: 0; overflow: hidden; transition: max-height .25s ease; background: #fff; }
         .svc-title { font-size: 16px; font-weight: 700; color: #3b3f5c; }
@@ -430,7 +432,9 @@
                         <li class="accordion-item" id="item-${service.id}">
                             <div class="accordion-header" onclick="toggleServiceDetails(${service.id})">
                                 <div class="header-left">
-                                    <span class="chevron">▸</span>
+                                    <span class="chevron" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" focusable="false"><path d="M9 6l8 6-8 6V6z"/></svg>
+                                    </span>
                                     <strong class="svc-title">${service.name}</strong>
                                 </div>
                                 <div class="header-right" onclick="event.stopPropagation();">
