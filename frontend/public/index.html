@@ -98,14 +98,12 @@
         .chevron { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; transition: transform .2s ease, background-color .2s ease; color:#8792a2; border-radius:6px; }
         .chevron svg { width:16px; height:16px; fill:#8792a2; }
         .accordion-header:hover .chevron { background:#eef1f6; }
-        <style>
             .btn[disabled] { opacity: 0.6; cursor: not-allowed; }
             .spinner {
                 display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%;
                 animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px;
             }
             @keyframes spin { to { transform: rotate(360deg); } }
-        </style>
 
         .accordion-item.open .chevron { transform: rotate(90deg); }
         .accordion-content { max-height: 0; overflow: hidden; transition: max-height .25s ease; background: #fff; }
