@@ -436,12 +436,13 @@
                             </div>
                             <div class="accordion-content" id="svc-${service.id}">
                                 <div class="content-inner">
-                                    <div><strong>StreamHTTP:</strong> <code id="url-${service.id}">加载中...</code> <button class="btn inline-btn btn-secondary" onclick="copyServiceUrl(${service.id}, event)">复制</button></div>
-                                    <div style="margin-top:10px;"><strong>SSE:</strong> <code id="sse-${service.id}">加载中...</code> <button class="btn inline-btn btn-secondary" onclick="copySse(${service.id}, event)">复制</button></div>
+                                    <div><strong>StreamHTTP（无需本地代理）:</strong> <code id="url-${service.id}">加载中...</code> <button class="btn inline-btn btn-secondary" onclick="copyServiceUrl(${service.id}, event)">复制</button></div>
+                                    <div style="margin-top:10px;"><strong>SSE（无需本地代理）:</strong> <code id="sse-${service.id}">加载中...</code> <button class="btn inline-btn btn-secondary" onclick="copySse(${service.id}, event)">复制</button></div>
                                     <div style="margin-top:12px;">
-                                        <strong>Claude Desktop 片段:</strong>
+                                        <strong>Claude Desktop 片段（需要本地 mcp-proxy）:</strong>
                                         <pre class="code-block" style="max-height: 180px; overflow: auto;" id="claude-${service.id}">加载中...</pre>
                                         <button class="btn inline-btn btn-secondary" onclick="copyClaude(${service.id}, event)">复制</button>
+                                        <div class="help-text" style="margin-top:6px;">注：若你的客户端原生支持 StreamHTTP 或 SSE，可直接使用上面的链接，无需在本地安装 mcp-proxy。</div>
                                     </div>
                                 </div>
                             </div>
