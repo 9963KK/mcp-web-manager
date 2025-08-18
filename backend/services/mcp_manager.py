@@ -8,9 +8,9 @@ import subprocess
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import psutil
+import shutil
 
-from mcp.client.stdio import StdioServerParameters
-from core.mcp_server import MCPServerSettings, run_mcp_server
+# 采用方案A：以独立 mcp-proxy 进程运行，不再在进程内启动代理服务器
 from models import MCPService, ServiceStatus
 from database.crud import service_crud, proxy_instance_crud, status_log_crud
 
@@ -77,7 +77,7 @@ class MCPServiceManager:
         self.processes: Dict[int, subprocess.Popen] = {}  # service_id -> process
         
     async def start_service(self, db, service: MCPService) -> Tuple[bool, str]:
-        """启动MCP服务."""
+        """启动MCP服务（独立 mcp-proxy 进程）."""
         try:
             if service.id in self.running_services:
                 return False, "服务已在运行中"
@@ -101,52 +101,53 @@ class MCPServiceManager:
             # 更新服务状态为启动中
             service_crud.update_status(db, service.id, ServiceStatus.STARTING, "正在启动服务...")
             
-            # 创建stdio服务器参数
-            stdio_params = StdioServerParameters(
-                command=service.command,
-                args=service.args,
-                env=service.env_vars or {},
-                cwd=service.working_directory
-            )
-            
-            # 创建MCP服务器设置
+            # 以外部 mcp-proxy 进程运行，默认服务器路由为 /mcp 与 /sse
             bind_host = (
                 service.streamhttp_host if service.streamhttp_host not in ("127.0.0.1", "localhost") else "0.0.0.0"
             )
-            mcp_settings = MCPServerSettings(
-                bind_host=bind_host,
-                port=port,
-                stateless=False,
-                allow_origins=["*"],  # 开发环境允许所有来源
-                log_level="INFO"
+            mcp_proxy_bin = shutil.which("mcp-proxy") or "mcp-proxy"
+            base_cmd: List[str] = [
+                mcp_proxy_bin,
+                "--host", str(bind_host),
+                "--port", str(port),
+                "--allow-origin", "*",
+                "--pass-environment",
+                "--",
+                service.command,
+            ] + (service.args or [])
+
+            env = os.environ.copy()
+            if service.env_vars:
+                env.update({k: str(v) for k, v in (service.env_vars or {}).items()})
+
+            working_dir = service.working_directory or None
+
+            process = subprocess.Popen(
+                base_cmd,
+                cwd=working_dir,
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
-            
-            # 启动MCP代理服务器（以命名服务器方式挂载到 /{service.name} 下）
-            task = asyncio.create_task(
-                run_mcp_server(
-                    mcp_settings=mcp_settings,
-                    default_server_params=None,
-                    named_server_params={service.name: stdio_params},
-                    mount_base=""  # 根路径，形如 /{name}/mcp
-                )
-            )
-            
+
+            # 等待端口开放
+            await self._wait_port_open("127.0.0.1", port, timeout=8.0)
+
             # 记录运行信息
             service_info = {
-                "task": task,
+                "process": process,
+                "pid": process.pid,
                 "port": port,
                 "host": bind_host,
-                "base_path": f"/{service.name}",
+                "base_path": "",
                 "started_at": datetime.now(),
-                "stdio_params": stdio_params,
-                "mcp_settings": mcp_settings
             }
             
             self.running_services[service.id] = service_info
             
             # 创建代理实例记录
-            sse_url = f"http://{service.streamhttp_host}:{port}/{service.name}/sse"
-            streamhttp_url = f"http://{service.streamhttp_host}:{port}/{service.name}/mcp"
+            sse_url = f"http://{service.streamhttp_host}:{port}/sse"
+            streamhttp_url = f"http://{service.streamhttp_host}:{port}/mcp"
             
             proxy_instance_crud.create(
                 db=db,
@@ -157,7 +158,8 @@ class MCPServiceManager:
                 host=service.streamhttp_host,
                 is_active=True,
                 stateless=False,
-                allow_origins=["*"]
+                allow_origins=["*"],
+                pid=process.pid,
             )
             
             # 更新服务状态
@@ -169,7 +171,7 @@ class MCPServiceManager:
             if broadcaster:
                 asyncio.create_task(broadcaster.service_started(service.id, service.name, port))
             
-            logger.info(f"Service {service.name} started on port {port} at path /{service.name}")
+            logger.info(f"Service {service.name} started on port {port} (external mcp-proxy pid={process.pid})")
             return True, f"服务已成功启动，端口: {port}"
             
         except Exception as e:
@@ -190,7 +192,7 @@ class MCPServiceManager:
             return False, f"启动失败: {str(e)}"
     
     async def stop_service(self, db, service_id: int) -> Tuple[bool, str]:
-        """停止MCP服务."""
+        """停止MCP服务（终止外部 mcp-proxy 进程）。"""
         try:
             if service_id not in self.running_services:
                 return False, "服务未在运行中"
@@ -206,14 +208,18 @@ class MCPServiceManager:
                 if service:
                     asyncio.create_task(broadcaster.service_stopping(service_id, service.name))
             
-            # 取消任务
-            task = service_info["task"]
-            task.cancel()
-            
-            try:
-                await asyncio.wait_for(task, timeout=10.0)
-            except (asyncio.CancelledError, asyncio.TimeoutError):
-                pass
+            # 终止外部进程
+            process: Optional[subprocess.Popen] = service_info.get("process")
+            if process and psutil.pid_exists(process.pid):
+                try:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=6)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=3)
+                except Exception as ex:  # noqa: BLE001
+                    logger.warning("Error terminating process %s: %s", process.pid, ex)
             
             # 等待端口真正释放后再释放记录，避免立即重启时判定占用
             port = service_info["port"]
@@ -293,8 +299,8 @@ class MCPServiceManager:
             "port": service_info["port"],
             "host": service_info["host"],
             "started_at": service_info["started_at"],
-            "sse_url": f"http://{service_info['host']}:{service_info['port']}{service_info.get('base_path','')}/sse",
-            "streamhttp_url": f"http://{service_info['host']}:{service_info['port']}{service_info.get('base_path','')}/mcp"
+            "sse_url": f"http://{service_info['host']}:{service_info['port']}/sse",
+            "streamhttp_url": f"http://{service_info['host']}:{service_info['port']}/mcp"
         }
     
     def get_all_running_services(self) -> Dict[int, Dict]:
@@ -305,8 +311,8 @@ class MCPServiceManager:
                 "port": service_info["port"],
                 "host": service_info["host"],
                 "started_at": service_info["started_at"],
-                "sse_url": f"http://{service_info['host']}:{service_info['port']}{service_info.get('base_path','')}/sse",
-                "streamhttp_url": f"http://{service_info['host']}:{service_info['port']}{service_info.get('base_path','')}/mcp"
+                "sse_url": f"http://{service_info['host']}:{service_info['port']}/sse",
+                "streamhttp_url": f"http://{service_info['host']}:{service_info['port']}/mcp"
             }
         return result
     
@@ -318,6 +324,23 @@ class MCPServiceManager:
                 await self.stop_service(db, service_id)
             except Exception as e:
                 logger.error(f"Error stopping service {service_id}: {e}")
+
+    async def _wait_port_open(self, host: str, port: int, timeout: float = 8.0) -> None:
+        """等待端口开始监听或超时."""
+        start = asyncio.get_event_loop().time()
+        import socket
+        while True:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(0.2)
+                try:
+                    if sock.connect_ex((host, port)) == 0:
+                        return
+                except Exception:
+                    pass
+            if asyncio.get_event_loop().time() - start > timeout:
+                logger.warning("Port %s not opened within %.1fs", port, timeout)
+                return
+            await asyncio.sleep(0.2)
 
 
 # 创建全局服务管理器实例
