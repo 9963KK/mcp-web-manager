@@ -222,6 +222,15 @@
             connectWebSocket();
             loadServices();
             loadStats();
+            // 点击遮罩关闭弹窗
+            const jsonModal = document.getElementById('jsonModal');
+            if (jsonModal) {
+                jsonModal.addEventListener('click', (e) => {
+                    if (e.target === e.currentTarget) {
+                        closeJsonModal();
+                    }
+                });
+            }
         });
         
         // 检查API状态
