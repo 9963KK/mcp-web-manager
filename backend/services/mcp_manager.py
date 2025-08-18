@@ -122,6 +122,14 @@ class MCPServiceManager:
 
             working_dir = service.working_directory or None
 
+            # 确保子进程优先加载本仓库内的 mcp-proxy 源码（以便我们自带的路由修复生效）
+            env = os.environ.copy()
+            if service.env_vars:
+                env.update({k: str(v) for k, v in (service.env_vars or {}).items()})
+            repo_proxy_path = "/root/mcp-web-manager/mcp-proxy/src"
+            existing_pythonpath = env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = f"{repo_proxy_path}:{existing_pythonpath}" if existing_pythonpath else repo_proxy_path
+
             process = subprocess.Popen(
                 base_cmd,
                 cwd=working_dir,
