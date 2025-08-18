@@ -101,20 +101,27 @@
         .content-inner { padding: 12px 16px 14px 42px; }
 
         .service-status {
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid transparent;
         }
+        .service-status .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
-        .status-active {
-            background: #d4edda;
-            color: #155724;
-        }
+        .status-active { color: #05603a; background: #ecfdf3; border-color: #abefc6; }
+        .status-active .dot { background: #12b76a; box-shadow: 0 0 0 3px rgba(18,183,106,0.15); animation: pulse 2s infinite; }
 
-        .status-inactive {
-            background: #f8d7da;
-            color: #721c24;
+        .status-inactive { color: #b42318; background: #fff1f3; border-color: #ffd1d5; }
+        .status-inactive .dot { background: #f04438; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(18,183,106,0.35); }
+            70% { box-shadow: 0 0 0 6px rgba(18,183,106,0); }
+            100% { box-shadow: 0 0 0 0 rgba(18,183,106,0); }
         }
 
         .loading {
@@ -428,7 +435,7 @@
                                     </div>
                                 </div>
                                 <div class="header-right" onclick="event.stopPropagation();">
-                                    <span class="service-status status-${service.status}">${getStatusText(service.status)}</span>
+                                    <span class="service-status status-${service.status}"><span class="dot"></span>${getStatusText(service.status)}</span>
                                     <button class="btn btn-sm" onclick="manageService(${service.id}, '${service.status}')">${service.status === 'active' ? '停止' : '启动'}</button>
                                     <button class="btn btn-sm btn-danger" onclick="deleteService(${service.id}, '${service.name.replace(/'/g, "\\'")}')">删除</button>
                                 </div>
