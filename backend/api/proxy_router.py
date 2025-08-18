@@ -28,6 +28,9 @@ from database.crud import service_crud, proxy_instance_crud
 from models import ServiceStatus
 
 router = APIRouter()
+# Cache session_id -> target instance mapping to route /messages requests
+SESSION_TARGETS: dict[str, dict[str, Any]] = {}
+
 
 
 def _resolve_active_instance_by_name(name: str) -> dict[str, Any] | None:
@@ -73,6 +76,16 @@ async def _forward_streamable_http(request: Request, target_base: str, tail: str
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.request(method, url, headers=headers, content=body)
+        # If this is a session creation, cache the target for later /messages routing
+        if resp.status_code in (200, 202):
+            try:
+                import json
+                data = json.loads(resp.content.decode("utf-8")) if resp.content else {}
+                session_id = data.get("id") or data.get("sessionId")
+                if session_id:
+                    SESSION_TARGETS[session_id] = {"host": target_base.split("://",1)[1].split(":")[0], "port": int(target_base.split(":")[-1].split("/")[0])}
+            except Exception:
+                pass
         return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
 
 
@@ -112,12 +125,20 @@ async def proxy_sse(name: str, request: Request) -> Response:
 @router.api_route("/{name}/messages/", methods=["POST"], include_in_schema=False)
 @router.api_route("/{name}/messages/{path:path}", methods=["POST"], include_in_schema=False)
 async def proxy_sse_messages(name: str, request: Request, path: str = "") -> Response:
-    target = _resolve_active_instance_by_name(name)
+    # Prefer routing by session_id to ensure we hit the same backend instance
+    qs = request.url.query
+    from urllib.parse import parse_qs
+    params = parse_qs(qs)
+    session_id = (params.get("session_id", [None])[0]) if qs else None
+
+    target = None
+    if session_id and session_id in SESSION_TARGETS:
+        target = SESSION_TARGETS[session_id]
+    else:
+        target = _resolve_active_instance_by_name(name)
     if not target:
         return PlainTextResponse("Service not found or inactive", status_code=503)
 
-    # Preserve query string (e.g., ?session_id=...)
-    qs = request.url.query
     tail = f"/{path}" if path else ""
     url = f"http://{target['host']}:{target['port']}/messages{tail}"
     if qs:
