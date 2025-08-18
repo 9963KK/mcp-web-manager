@@ -403,9 +403,14 @@
             try {
                 const response = await fetch('/api/services/');
                 const data = await response.json();
-                // 缓存服务基础数据
+                // 缓存服务基础数据，并在已停止/异常时清理配置缓存
                 if (data && Array.isArray(data.services)) {
-                    data.services.forEach(s => { servicesCache[s.id] = s; });
+                    data.services.forEach(s => {
+                        servicesCache[s.id] = s;
+                        if (s.status !== 'active') {
+                            delete serviceConfigs[s.id];
+                        }
+                    });
                 }
                 displayServices(data.services);
             } catch (error) {
@@ -496,6 +501,15 @@
                 // servicesCache 由 loadServices 更新
                 // 加载配置
                 const cfg = await ensureServiceConfig(serviceId);
+                    if (servicesCache[serviceId] && servicesCache[serviceId].status !== 'active') {
+                        document.getElementById(`url-${serviceId}`).textContent = '无法获取（服务未运行）';
+                        const sseEl = document.getElementById(`sse-${serviceId}`);
+                        if (sseEl) sseEl.textContent = '无法获取（服务未运行）';
+                        document.getElementById(`claude-${serviceId}`).textContent = '无法获取（服务未运行）';
+                        // 直接返回，不再填充已过期的缓存配置
+                        return;
+                    }
+
                 const streamUrl = (cfg && cfg.urls && cfg.urls.streamhttp) ? cfg.urls.streamhttp : '';
                 const sseUrl = (cfg && cfg.urls && cfg.urls.sse) ? cfg.urls.sse : '';
                 const displayStream = (function(u){ try { return rewriteHost(u).replace(/\/mcp$/, '/mcp/'); } catch(_) { return rewriteHost(u); } })(streamUrl);
