@@ -106,6 +106,9 @@ async def proxy_sse(name: str, request: Request) -> Response:
                     if chunk:
                         yield chunk
 
+    return StreamingResponse(_event_stream(), media_type="text/event-stream")
+
+
 @router.api_route("/{name}/messages/", methods=["POST"], include_in_schema=False)
 @router.api_route("/{name}/messages/{path:path}", methods=["POST"], include_in_schema=False)
 async def proxy_sse_messages(name: str, request: Request, path: str = "") -> Response:
@@ -131,8 +134,6 @@ async def proxy_sse_messages(name: str, request: Request, path: str = "") -> Res
     return StreamingResponse(_event_stream(), media_type="text/event-stream")
 
 
-@router.api_route("/{name}/messages/{path:path}", methods=["POST"], include_in_schema=False)
-
 @router.api_route("/{name}/mcp", methods=["GET"], include_in_schema=False)
 async def hint_get_streamable_http(name: str) -> Response:
     # 友好提示，避免 405 误导用户
@@ -141,18 +142,4 @@ async def hint_get_streamable_http(name: str) -> Response:
         "endpoint": f"/{name}/mcp",
         "method": "POST"
     })
-
-async def proxy_sse_messages(name: str, request: Request, path: str) -> Response:
-    target = _resolve_active_instance_by_name(name)
-    if not target:
-        return PlainTextResponse("Service not found or inactive", status_code=503)
-
-    # Forward to internal /messages/{path}
-    url = f"http://{target['host']}:{target['port']}/messages/{path}"
-    headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
-    body = await request.body()
-
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.post(url, headers=headers, content=body)
-        return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
 
