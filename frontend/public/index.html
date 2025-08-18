@@ -142,6 +142,7 @@
         .modal-footer { padding: 0.9rem 1.25rem 1.25rem 1.25rem; display: flex; gap: 0.75rem; justify-content: flex-end; }
         .textarea { width: 100%; min-height: 180px; max-height: 45vh; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 0.85rem; padding: 0.6rem 0.8rem; border: 1px solid #ddd; border-radius: 6px; outline: none; resize: vertical; }
         .textarea:focus { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.15); }
+        .textarea::placeholder { color: #b3b3b3; opacity: 1; }
         .help-text { color: #666; font-size: 0.85rem; margin-bottom: 0.5rem; }
         .inline-btn { padding: 0.4rem 0.8rem; font-size: 0.9rem; }
     </style>
@@ -264,7 +265,12 @@
     }
   }
 }`;
-            input.value = sample;
+            // 使用浅灰色 placeholder 作为提醒示例
+            input.value = '';
+            input.placeholder = sample;
+            // 焦点时隐藏提醒，失焦且为空时恢复
+            input.onfocus = () => { if (!input.value) { input.dataset.ph = input.placeholder; input.placeholder = ''; } };
+            input.onblur = () => { if (!input.value) { input.placeholder = input.dataset.ph || sample; } };
             modal.style.display = 'flex';
         }
         function closeJsonModal() {
