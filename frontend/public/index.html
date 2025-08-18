@@ -496,6 +496,20 @@
                 container.classList.remove('open');
                 return;
             }
+            // 若服务非运行中，立即显示“无法获取”，不等待网络请求
+            const status = servicesCache[serviceId]?.status;
+            if (status !== 'active') {
+                const urlEl = document.getElementById(`url-${serviceId}`);
+                const sseEl = document.getElementById(`sse-${serviceId}`);
+                const claudeEl = document.getElementById(`claude-${serviceId}`);
+                if (urlEl) urlEl.textContent = '无法获取（服务未运行）';
+                if (sseEl) sseEl.textContent = '无法获取（服务未运行）';
+                if (claudeEl) claudeEl.textContent = '无法获取（服务未运行）';
+                container.classList.add('open');
+                box.style.maxHeight = box.scrollHeight + 'px';
+                return;
+            }
+
             try {
                 // 缓存服务基本信息
                 // servicesCache 由 loadServices 更新
