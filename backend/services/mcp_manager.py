@@ -8,6 +8,7 @@ import subprocess
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import psutil
+import sys
 import shutil
 
 # 采用方案A：以独立 mcp-proxy 进程运行，不再在进程内启动代理服务器
@@ -105,9 +106,10 @@ class MCPServiceManager:
             bind_host = (
                 service.streamhttp_host if service.streamhttp_host not in ("127.0.0.1", "localhost") else "0.0.0.0"
             )
-            mcp_proxy_bin = shutil.which("mcp-proxy") or "mcp-proxy"
+            # 使用 python -m mcp_proxy 以确保通过 PYTHONPATH 加载到本仓库内源码
+            python_exec = sys.executable or shutil.which("python3") or "python3"
             base_cmd: List[str] = [
-                mcp_proxy_bin,
+                python_exec, "-m", "mcp_proxy",
                 "--host", str(bind_host),
                 "--port", str(port),
                 "--allow-origin", "*",
