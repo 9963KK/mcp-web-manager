@@ -253,7 +253,18 @@
         function openJsonModal() {
             const modal = document.getElementById('jsonModal');
             const input = document.getElementById('jsonInput');
-            input.value = '';
+            const sample = `{
+  "mcpServers": {
+    "fetch": {
+      "enabled": true,
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "env": { "API_KEY": "xxxxx" },
+      "cwd": "/root"
+    }
+  }
+}`;
+            input.value = sample;
             modal.style.display = 'flex';
         }
         function closeJsonModal() {
