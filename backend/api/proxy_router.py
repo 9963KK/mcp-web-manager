@@ -20,6 +20,9 @@ import asyncio
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 
+from urllib.parse import urlparse
+import re
+
 from database import SessionLocal
 from database.crud import service_crud, proxy_instance_crud
 from models import ServiceStatus
@@ -102,6 +105,28 @@ async def proxy_sse(name: str, request: Request) -> Response:
                 async for chunk in resp.aiter_bytes():
                     if chunk:
                         yield chunk
+
+@router.api_route("/{name}/messages/", methods=["POST"], include_in_schema=False)
+@router.api_route("/{name}/messages/{path:path}", methods=["POST"], include_in_schema=False)
+async def proxy_sse_messages(name: str, request: Request, path: str = "") -> Response:
+    target = _resolve_active_instance_by_name(name)
+    if not target:
+        return PlainTextResponse("Service not found or inactive", status_code=503)
+
+    # Preserve query string (e.g., ?session_id=...)
+    qs = request.url.query
+    tail = f"/{path}" if path else ""
+    url = f"http://{target['host']}:{target['port']}/messages{tail}"
+    if qs:
+        url = f"{url}?{qs}"
+
+    headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
+    body = await request.body()
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(url, headers=headers, content=body)
+        return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
+
 
     return StreamingResponse(_event_stream(), media_type="text/event-stream")
 
