@@ -139,8 +139,9 @@ async def proxy_sse_messages(name: str, request: Request, path: str = "") -> Res
     if not target:
         return PlainTextResponse("Service not found or inactive", status_code=503)
 
-    tail = f"/{path}" if path else ""
-    url = f"http://{target['host']}:{target['port']}/messages{tail}"
+    # Always keep trailing slash for base '/messages/' on internal server
+    base = f"http://{target['host']}:{target['port']}/messages/"
+    url = f"{base}{path}" if path else base
     if qs:
         url = f"{url}?{qs}"
 
@@ -166,10 +167,11 @@ async def proxy_sse_messages_root(request: Request, path: str = "") -> Response:
     target = SESSION_TARGETS.get(session_id)
     headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
     body = await request.body()
-    tail = f"/{path}" if path else ""
+    base_tail = f"{path}" if path else ""
 
     async def _forward_to(host: str, port: int) -> Response:
-        url = f"http://{host}:{port}/messages{tail}"
+        base = f"http://{host}:{port}/messages/"
+        url = f"{base}{base_tail}"
         url = f"{url}?{qs}" if qs else url
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.post(url, headers=headers, content=body)
