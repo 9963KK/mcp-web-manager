@@ -477,13 +477,14 @@
                 const cfg = await ensureServiceConfig(serviceId);
                 const streamUrl = (cfg && cfg.urls && cfg.urls.streamhttp) ? cfg.urls.streamhttp : '';
                 const sseUrl = (cfg && cfg.urls && cfg.urls.sse) ? cfg.urls.sse : '';
-                const displayStream = rewriteHost(streamUrl);
+                const displayStream = (function(u){ try { return rewriteHost(u).replace(/\/mcp$/, '/mcp/'); } catch(_) { return rewriteHost(u); } })(streamUrl);
                 const displaySse = rewriteHost(sseUrl || (streamUrl ? streamUrl.replace('/mcp','/sse') : ''));
                 document.getElementById(`url-${serviceId}`).textContent = displayStream || '未获取到URL';
                 document.getElementById(`sse-${serviceId}`).textContent = displaySse || '未获取到URL';
                 const name = cfg && cfg.service_name ? cfg.service_name : (servicesCache[serviceId]?.name || `service-${serviceId}`);
                 const env = (cfg && cfg.config && cfg.config.env) ? cfg.config.env : (servicesCache[serviceId]?.env_vars || {});
-                const snippetObj = { mcpServers: { [name]: { command: 'mcp-proxy', args: [ displaySse || displayStream.replace('/mcp','/sse') ], ...(env && Object.keys(env).length ? { env } : {}) } } };
+                const fixedStream = displayStream.endsWith('/mcp') ? (displayStream + '/') : displayStream;
+                const snippetObj = { mcpServers: { [name]: { command: 'mcp-proxy', args: [ displaySse || fixedStream.replace('/mcp/','/sse') ], ...(env && Object.keys(env).length ? { env } : {}) } } };
                 document.getElementById(`claude-${serviceId}`).textContent = JSON.stringify(snippetObj, null, 2);
             } catch (e) {
                 document.getElementById(`url-${serviceId}`).textContent = '获取失败';
