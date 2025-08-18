@@ -95,9 +95,11 @@
         .header-left { display: flex; align-items: center; gap: 10px; }
         .header-left small { color: #666; }
         .header-right { display: flex; align-items: center; gap: 8px; }
-        .chevron { display:inline-block; transition: transform .2s ease; color:#8792a2; }
+        .chevron { display:inline-block; transition: transform .2s ease; color:#8792a2; font-size: 18px; line-height: 1; }
         .accordion-item.open .chevron { transform: rotate(90deg); }
         .accordion-content { max-height: 0; overflow: hidden; transition: max-height .25s ease; background: #fff; }
+        .svc-title { font-size: 16px; font-weight: 700; color: #3b3f5c; }
+
         .content-inner { padding: 12px 16px 14px 42px; }
 
         .service-status {
@@ -429,10 +431,7 @@
                             <div class="accordion-header" onclick="toggleServiceDetails(${service.id})">
                                 <div class="header-left">
                                     <span class="chevron">▸</span>
-                                    <div>
-                                        <strong>${service.name}</strong><br>
-                                        <small>${service.description || '无描述'}</small>
-                                    </div>
+                                    <strong class="svc-title">${service.name}</strong>
                                 </div>
                                 <div class="header-right" onclick="event.stopPropagation();">
                                     <span class="service-status status-${service.status}"><span class="dot"></span>${getStatusText(service.status)}</span>
