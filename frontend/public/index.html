@@ -176,7 +176,6 @@
         
         <div class="card">
             <h2>🎛️ 快速操作</h2>
-            <button class="btn" onclick="addService()">添加服务</button>
             <button class="btn" onclick="openJsonModal()">从JSON添加</button>
             <button class="btn" onclick="refreshData()">刷新数据</button>
             <button class="btn" onclick="showDocs()">查看API文档</button>
@@ -392,7 +391,7 @@
             const list = document.getElementById('servicesList');
             
             if (services.length === 0) {
-                list.innerHTML = '<p>暂无服务，点击"添加服务"开始使用</p>';
+                list.innerHTML = '<p>暂无服务，点击"从JSON添加"开始使用</p>';
                 return;
             }
             
@@ -644,24 +643,7 @@
             }
         }
         
-        // 添加服务
-        function addService() {
-            const name = prompt('服务名称:');
-            if (!name) return;
-            
-            const command = prompt('启动命令 (例如: uvx mcp-server-fetch):');
-            if (!command) return;
-            
-            const description = prompt('服务描述 (可选):') || '';
-            
-            createService({
-                name: name,
-                description: description,
-                command: command,
-                args: [],
-                env_vars: {}
-            });
-        }
+
         
         // 创建服务
         async function createService(serviceData) {
