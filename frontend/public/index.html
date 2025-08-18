@@ -250,7 +250,8 @@
         let ws = null;
         
         // 初始化
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            await ensureDisplayHost();
             checkApiStatus();
             connectWebSocket();
             loadServices();
@@ -544,12 +545,23 @@
             }
         }
 
-        // 将 URL 的主机名替换为当前站点的主机，避免复制到 127.0.0.1 导致外网不可访问
+        // 将 URL 的主机名替换为后端提供的展示主机（优先外网），避免复制到 127.0.0.1
+        async function ensureDisplayHost() {
+            if (window.__DISPLAY_HOST__) return window.__DISPLAY_HOST__;
+            try {
+                const r = await fetch('/api/system/display-host');
+                const j = await r.json();
+                window.__DISPLAY_HOST__ = (j && j.host) ? j.host : location.hostname;
+            } catch (_) {
+                window.__DISPLAY_HOST__ = location.hostname;
+            }
+            return window.__DISPLAY_HOST__;
+        }
         function rewriteHost(url) {
             if (!url) return url;
             try {
                 const u = new URL(url);
-                u.hostname = location.hostname;
+                u.hostname = window.__DISPLAY_HOST__ || location.hostname;
                 return u.toString();
             } catch (_) {
                 return url;

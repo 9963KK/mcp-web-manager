@@ -4,7 +4,7 @@ import logging
 import asyncio
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -112,6 +112,24 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health_check():
         return {"status": "healthy", "service": "mcp-web-manager"}
+    
+    # 提供用于前端展示用的主机名（外网/本机）
+    @app.get("/api/system/display-host")
+    async def get_display_host(request: Request):
+        import os as _os
+        env_host = _os.getenv("PUBLIC_HOST") or _os.getenv("BASE_HOST") or _os.getenv("PUBLIC_IP")
+        req_host = request.headers.get("host", "")
+        host_only = req_host.split(":")[0] if req_host else ""
+
+        def _is_local(h: str) -> bool:
+            return h in ("localhost", "127.0.0.1", "")
+
+        if env_host and not _is_local(env_host):
+            return {"host": env_host, "source": "env", "request_host": host_only}
+        if host_only and not _is_local(host_only):
+            return {"host": host_only, "source": "request_host", "request_host": host_only}
+        # 默认本地
+        return {"host": "127.0.0.1", "source": "local_default", "request_host": host_only}
     
     # 如果没有静态文件，提供默认根路径
     if not os.path.exists(frontend_dir):
