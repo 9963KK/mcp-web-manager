@@ -179,6 +179,10 @@
             .switch input:checked + .slider:before { transform: translateX(18px); }
             .switch.disabled { opacity: .6; pointer-events: none; }
 
+            .switch.loading { cursor: progress; }
+            .switch.loading .slider { background: #cfd4dc !important; }
+            .switch.loading .slider:before { border: 2px solid rgba(0,0,0,0.25); border-top-color: transparent; background: #fff; animation: spin 0.8s linear infinite; }
+
             /* 垃圾桶图标按钮 */
             .icon-btn { border: 1px solid #eee; background: #fff; color: #b42318; padding: 6px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
             .icon-btn:hover { background: #fff1f3; border-color: #ffd1d5; }
@@ -465,7 +469,7 @@
                                 </div>
                                 <div class="header-right" onclick="event.stopPropagation();">
                                     <span class="service-status status-${service.status}"><span class="dot"></span>${getStatusText(service.status)}</span>
-                                    <label class="switch ${['starting','stopping'].includes(service.status) ? 'disabled' : ''}" title="启动/停止">
+                                    <label class="switch ${['starting','stopping'].includes(service.status) ? 'disabled' : ''}" id="switch-${service.id}" title="启动/停止">
                                         <input type="checkbox" id="toggle-${service.id}" ${service.status === 'active' ? 'checked' : ''} ${['starting','stopping'].includes(service.status) ? 'disabled' : ''} onchange="toggleService(${service.id}, this.checked, event)">
                                         <span class="slider"></span>
                                     </label>
@@ -798,6 +802,8 @@
             const desired = checked ? 'active' : 'inactive';
             const input = document.getElementById(`toggle-${serviceId}`);
             if (input) input.disabled = true;
+            const sw = document.getElementById(`switch-${serviceId}`);
+            if (sw) sw.classList.add('loading');
 
             // 辅助：查询状态
             async function fetchStatus() {
@@ -840,6 +846,8 @@
                 if (input) input.checked = !checked;
             } finally {
                 if (input) input.disabled = false;
+                const sw = document.getElementById(`switch-${serviceId}`);
+                if (sw) sw.classList.remove('loading');
             }
         }
 
