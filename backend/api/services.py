@@ -32,7 +32,7 @@ async def list_services(
     """获取所有MCP服务列表."""
     services = service_crud.get_all(db, skip=skip, limit=limit)
     stats = service_crud.get_stats(db)
-    
+
     return ServiceListResponse(
         services=services,
         total=stats["total"],
@@ -67,7 +67,7 @@ async def create_service(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="服务名称已存在"
         )
-    
+
     return service_crud.create(db, service)
 
 
@@ -84,7 +84,7 @@ async def update_service(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="服务不存在"
         )
-    
+
     # 如果更新名称，检查是否与其他服务冲突
     if service_update.name and service_update.name != service.name:
         existing_service = service_crud.get_by_name(db, service_update.name)
@@ -93,7 +93,7 @@ async def update_service(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="服务名称已存在"
             )
-    
+
     updated_service = service_crud.update(db, service_id, service_update)
     return updated_service
 
@@ -107,11 +107,11 @@ async def delete_service(service_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="服务不存在"
         )
-    
+
     # 如果服务正在运行，先停止
     if service_id in mcp_service_manager.running_services:
         await mcp_service_manager.stop_service(db, service_id)
-    
+
     success = service_crud.delete(db, service_id)
     if success:
         return {"message": "服务已删除"}
@@ -135,10 +135,10 @@ async def service_action(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="服务不存在"
         )
-    
+
     success = False
     message = ""
-    
+
     if action.action == "start":
         # 异步后台启动，快速响应，与停止保持一致
         async def _start_in_background(svc_id: int):
@@ -183,9 +183,9 @@ async def get_service_status(service_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="服务不存在"
         )
-    
+
     runtime_status = mcp_service_manager.get_service_status(service_id)
-    
+
     return {
         "service_id": service_id,
         "name": service.name,
@@ -209,7 +209,7 @@ async def get_service_logs(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="服务不存在"
         )
-    
+
     logs = status_log_crud.get_by_service(db, service_id, limit)
     return logs
 
@@ -226,9 +226,62 @@ async def get_service_proxy_instances(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="服务不存在"
         )
-    
+
     instances = proxy_instance_crud.get_by_service(db, service_id)
     return instances
+
+
+
+@router.get("/{service_id}/tools/count")
+async def get_service_tools_count(service_id: int, db: Session = Depends(get_db)):
+    """返回运行中服务的工具数量（通过StreamHTTP实时探测）。
+
+    - 仅在服务处于 active 且存在活跃代理实例时尝试探测
+    - 如库依赖缺失或探测失败，返回详细错误信息，便于前端降级
+    """
+    service = service_crud.get_by_id(db, service_id)
+    if not service:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="服务不存在")
+
+    # 仅在运行中才探测
+    if getattr(service, "status", None) != "active":
+        return {"count": 0, "status": service.status, "message": "服务未运行"}
+
+    # 选择最新活跃实例
+    instances = proxy_instance_crud.get_by_service(db, service_id)
+    active = [inst for inst in instances if getattr(inst, "is_active", False)]
+    if not active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="无活跃代理实例")
+    inst = max(active, key=lambda x: x.id)
+    url = f"http://{getattr(inst, 'host', '127.0.0.1')}:{inst.port}/mcp"
+
+    try:
+        # 动态导入，避免环境无依赖时报错影响其他接口
+        from mcp.client.session import ClientSession  # type: ignore
+        from mcp.client.streamable_http import streamablehttp_client  # type: ignore
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"MCP客户端依赖缺失: {e}") from e
+
+    import asyncio
+
+    async def _probe_tools_count(target_url: str) -> int:
+        async with streamablehttp_client(url=target_url) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                tools = await session.list_tools()
+                # tools 可能是对象或普通列表，尽量兼容
+                try:
+                    return len(getattr(tools, "tools", tools) or [])
+                except Exception:  # noqa: BLE001
+                    return 0
+
+    try:
+        count = await asyncio.wait_for(_probe_tools_count(url), timeout=4.0)
+        return {"count": int(count), "status": service.status}
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="探测工具数超时")
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"探测工具数失败: {e}") from e
 
 
 @router.post("/import", response_model=ImportResultResponse)
