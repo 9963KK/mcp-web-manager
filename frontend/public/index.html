@@ -515,15 +515,14 @@
                     badge.classList.add('show');
                     badge.textContent = '…';
                     fetch(`/api/services/${svc.id}/tools/count`).then(async r => {
-                        if (!r.ok) throw new Error('bad status');
-                        const d = await r.json();
-                        if (servicesCache[svc.id]?.status === 'active' && typeof d.count === 'number') {
+                        const d = await r.json().catch(() => ({}));
+                        if (!r.ok) throw new Error(d?.detail || 'fetch-failed');
+                        if (typeof d.count === 'number') {
                             badge.textContent = String(d.count);
-                            badge.classList.add('show');
                         } else {
-                            badge.classList.remove('show');
+                            badge.textContent = '—';
                         }
-                    }).catch(() => { badge.classList.remove('show'); });
+                    }).catch(() => { badge.textContent = '—'; });
                 });
             } catch (_) { /* ignore */ }
 
