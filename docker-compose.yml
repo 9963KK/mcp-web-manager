@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  mcp-web-manager:
+    build: .
+    container_name: mcp-web-manager
+    ports:
+      - "8765:8765"
+    environment:
+      - DATABASE_URL=sqlite:////data/mcp_web_manager.db
+    volumes:
+      - mcpwm-data:/data
+    restart: unless-stopped
+
+volumes:
+  mcpwm-data:
+    driver: local
+

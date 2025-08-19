@@ -128,7 +128,10 @@ class MCPServiceManager:
             env = os.environ.copy()
             if service.env_vars:
                 env.update({k: str(v) for k, v in (service.env_vars or {}).items()})
-            repo_proxy_path = "/root/mcp-web-manager/mcp-proxy/src"
+            # 在容器/不同路径下保持兼容：基于当前文件推导仓库根目录
+            import pathlib
+            repo_root = pathlib.Path(__file__).resolve().parents[2]
+            repo_proxy_path = str(repo_root / "mcp-proxy" / "src")
             existing_pythonpath = env.get("PYTHONPATH", "")
             env["PYTHONPATH"] = f"{repo_proxy_path}:{existing_pythonpath}" if existing_pythonpath else repo_proxy_path
 
