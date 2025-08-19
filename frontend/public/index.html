@@ -289,6 +289,50 @@
     <script>
         let ws = null;
 
+
+        // 工具数：状态过渡触发 + 结果缓存，避免频繁刷新
+        const toolCountCache = new Map(); // id -> {count, ts}
+        const lastStatusMap = new Map();  // id -> 'active'|'inactive'|...
+
+        async function fetchToolsCount(id) {
+            try {
+                const r = await fetch(`/api/services/${id}/tools/count`);
+                const d = await r.json().catch(() => ({}));
+                if (!r.ok || typeof d.count !== 'number') return null;
+                return d.count;
+            } catch { return null; }
+        }
+
+        async function maybeFetchToolsCount(svc) {
+            const badge = document.getElementById(`tools-${svc.id}`);
+            if (!badge) return;
+
+            const prev = lastStatusMap.get(svc.id);
+            lastStatusMap.set(svc.id, svc.status);
+
+            if (svc.status !== 'active') {
+                badge.classList.remove('show');
+                badge.textContent = '';
+                return;
+            }
+
+            // 仍为 active：优先使用缓存
+            const cached = toolCountCache.get(svc.id);
+            if (cached && typeof cached.count === 'number') {
+                badge.classList.add('show');
+                badge.textContent = String(cached.count);
+            }
+
+            // 仅在“刚变为 active”时请求一次，避免列表频繁刷新导致的抖动
+            if (prev !== 'active') {
+                badge.classList.add('show');
+                if (!cached) badge.textContent = '…';
+                const c = await fetchToolsCount(svc.id);
+                badge.textContent = (c != null) ? String(c) : '—';
+                if (c != null) toolCountCache.set(svc.id, { count: c, ts: Date.now() });
+            }
+        }
+
         // 初始化
         document.addEventListener('DOMContentLoaded', async function() {
             await ensureDisplayHost();
@@ -538,24 +582,9 @@
 
             list.innerHTML = html;
 
-            // 渲染后：异步获取每个 Active 服务的工具数并更新徽标
+            // 渲染后：仅在从非active切换为active时获取工具数；其余场景使用缓存，避免闪动
             try {
-                services.forEach(svc => {
-                    const badge = document.getElementById(`tools-${svc.id}`);
-                    if (!badge) return;
-                    if (svc.status !== 'active') { badge.classList.remove('show'); badge.textContent = ''; return; }
-                    badge.classList.add('show');
-                    badge.textContent = '…';
-                    fetch(`/api/services/${svc.id}/tools/count`).then(async r => {
-                        const d = await r.json().catch(() => ({}));
-                        if (!r.ok) throw new Error(d?.detail || 'fetch-failed');
-                        if (typeof d.count === 'number') {
-                            badge.textContent = String(d.count);
-                        } else {
-                            badge.textContent = '—';
-                        }
-                    }).catch(() => { badge.textContent = '—'; });
-                });
+                services.forEach(svc => { maybeFetchToolsCount(svc); });
             } catch (_) { /* ignore */ }
 
         }
@@ -918,6 +947,13 @@
                     alert('操作已发送，但服务状态未就绪，请稍后再试或查看日志');
                 }
                 loadServices();
+                    // 若目标状态为 active，补充刷新该服务的工具数（避免等待全量刷新）
+                    if (desired === 'active') {
+                        // 先更新状态记忆，再请求一次（防止 maybeFetch 条件不触发）
+                        lastStatusMap.set(serviceId, 'inactive');
+                        await maybeFetchToolsCount({ id: serviceId, status: 'active' });
+                    }
+
                 loadStats();
             } catch (e) {
                 alert('网络错误: ' + e.message);
