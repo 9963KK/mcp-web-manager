@@ -169,6 +169,20 @@
         .textarea:focus { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.15); }
         .textarea::placeholder { color: #b3b3b3; opacity: 1; }
         .help-text { color: #666; font-size: 0.85rem; margin-bottom: 0.5rem; }
+
+            /* 开关样式 */
+            .switch { position: relative; display: inline-block; width: 42px; height: 24px; }
+            .switch input { display: none; }
+            .switch .slider { position: absolute; inset: 0; background: #cfd4dc; border-radius: 999px; transition: background .2s; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06); }
+            .switch .slider:before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; box-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+            .switch input:checked + .slider { background: #1e6bff; }
+            .switch input:checked + .slider:before { transform: translateX(18px); }
+            .switch.disabled { opacity: .6; pointer-events: none; }
+
+            /* 垃圾桶图标按钮 */
+            .icon-btn { border: 1px solid #eee; background: #fff; color: #b42318; padding: 6px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+            .icon-btn:hover { background: #fff1f3; border-color: #ffd1d5; }
+
         .inline-btn { padding: 0.4rem 0.8rem; font-size: 0.9rem; }
     </style>
 </head>
@@ -451,8 +465,13 @@
                                 </div>
                                 <div class="header-right" onclick="event.stopPropagation();">
                                     <span class="service-status status-${service.status}"><span class="dot"></span>${getStatusText(service.status)}</span>
-                                    <button class="btn btn-sm" id="btn-${service.id}" onclick="manageService(${service.id}, '${service.status}', event)">${service.status === 'active' ? '停止' : '启动'}</button>
-                                    <button class="btn btn-sm btn-danger" onclick="deleteService(${service.id}, '${service.name.replace(/'/g, "\\'")}')">删除</button>
+                                    <label class="switch ${['starting','stopping'].includes(service.status) ? 'disabled' : ''}" title="启动/停止">
+                                        <input type="checkbox" id="toggle-${service.id}" ${service.status === 'active' ? 'checked' : ''} ${['starting','stopping'].includes(service.status) ? 'disabled' : ''} onchange="toggleService(${service.id}, this.checked, event)">
+                                        <span class="slider"></span>
+                                    </label>
+                                    <button class="icon-btn" aria-label="删除" title="删除" onclick="deleteService(${service.id}, '${service.name.replace(/'/g, "\\'")}')">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7H4V5h4V4a1 1 0 0 1 1-1zm1 2v0h4V5h-4zm-3 2v12h10V7H7z"/></svg>
+                                    </button>
                                 </div>
                             </div>
                             <div class="accordion-content" id="svc-${service.id}">
@@ -769,6 +788,34 @@
 
         // 显示API文档
         function showDocs() {
+
+        // 开关事件：封装 start/stop（放在脚本尾部，避免插入混入原函数）
+        async function toggleService(serviceId, checked, evt) {
+            if (evt) evt.stopPropagation();
+            const action = checked ? 'start' : 'stop';
+            const input = document.getElementById(`toggle-${serviceId}`);
+            if (input) input.disabled = true;
+            try {
+                const resp = await fetch(`/api/services/${serviceId}/action`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action })
+                });
+                const result = await resp.json().catch(() => ({}));
+                if (!resp.ok) {
+                    alert('操作失败: ' + (result.detail || '未知错误'));
+                    if (input) input.checked = !checked;
+                    return;
+                }
+                setTimeout(() => { loadServices(); loadStats(); }, 500);
+            } catch (e) {
+                alert('网络错误: ' + e.message);
+                if (input) input.checked = !checked;
+            } finally {
+                if (input) input.disabled = false;
+            }
+        }
+
             window.open('/api/docs', '_blank');
         }
 
