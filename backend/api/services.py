@@ -253,7 +253,8 @@ async def get_service_tools_count(service_id: int, db: Session = Depends(get_db)
     if not active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="无活跃代理实例")
     inst = max(active, key=lambda x: x.id)
-    url = f"http://{getattr(inst, 'host', '127.0.0.1')}:{inst.port}/mcp"
+    base = f"http://{getattr(inst, 'host', '127.0.0.1')}:{inst.port}"
+    candidate_urls = [f"{base}/mcp", f"{base}/mcp/"]  # 某些实现只接受带/，做容错
 
     try:
         # 动态导入，避免环境无依赖时报错影响其他接口
@@ -275,13 +276,21 @@ async def get_service_tools_count(service_id: int, db: Session = Depends(get_db)
                 except Exception:  # noqa: BLE001
                     return 0
 
-    try:
-        count = await asyncio.wait_for(_probe_tools_count(url), timeout=4.0)
-        return {"count": int(count), "status": service.status}
-    except asyncio.TimeoutError:
+    last_err: Exception | None = None
+    for u in candidate_urls:
+        try:
+            count = await asyncio.wait_for(_probe_tools_count(u), timeout=4.0)
+            return {"count": int(count), "status": service.status}
+        except asyncio.TimeoutError as e:
+            last_err = e
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            continue
+
+    # 全部失败
+    if isinstance(last_err, asyncio.TimeoutError):
         raise HTTPException(status_code=504, detail="探测工具数超时")
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"探测工具数失败: {e}") from e
+    raise HTTPException(status_code=502, detail=f"探测工具数失败: {last_err}")
 
 
 @router.post("/import", response_model=ImportResultResponse)
