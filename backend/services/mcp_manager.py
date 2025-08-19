@@ -106,10 +106,10 @@ class MCPServiceManager:
             bind_host = (
                 service.streamhttp_host if service.streamhttp_host not in ("127.0.0.1", "localhost") else "0.0.0.0"
             )
-            # 使用 python -m mcp_proxy 以确保通过 PYTHONPATH 加载到本仓库内源码
+            # 使用 python -m backend.core 直接运行后端内置核心（不再依赖 mcp-proxy/src）
             python_exec = sys.executable or shutil.which("python3") or "python3"
             base_cmd: List[str] = [
-                python_exec, "-m", "mcp_proxy",
+                python_exec, "-m", "backend.core",
                 "--host", str(bind_host),
                 "--port", str(port),
                 "--allow-origin", "*",
@@ -118,22 +118,19 @@ class MCPServiceManager:
                 service.command,
             ] + (service.args or [])
 
+            # 环境变量：继承 + 服务自定义 + 确保可导入 backend.core
             env = os.environ.copy()
             if service.env_vars:
                 env.update({k: str(v) for k, v in (service.env_vars or {}).items()})
 
             working_dir = service.working_directory or None
 
-            # 确保子进程优先加载本仓库内的 mcp-proxy 源码（以便我们自带的路由修复生效）
-            env = os.environ.copy()
-            if service.env_vars:
-                env.update({k: str(v) for k, v in (service.env_vars or {}).items()})
-            # 在容器/不同路径下保持兼容：基于当前文件推导仓库根目录
+            # 在容器/不同路径下保持兼容：基于当前文件推导仓库根目录，并加入 PYTHONPATH 以便 `-m backend.core` 可被找到
             import pathlib
             repo_root = pathlib.Path(__file__).resolve().parents[2]
-            repo_proxy_path = str(repo_root / "mcp-proxy" / "src")
+            repo_root_str = str(repo_root)
             existing_pythonpath = env.get("PYTHONPATH", "")
-            env["PYTHONPATH"] = f"{repo_proxy_path}:{existing_pythonpath}" if existing_pythonpath else repo_proxy_path
+            env["PYTHONPATH"] = f"{repo_root_str}:{existing_pythonpath}" if existing_pythonpath else repo_root_str
 
             process = subprocess.Popen(
                 base_cmd,
