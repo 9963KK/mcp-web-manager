@@ -526,14 +526,15 @@
 
                 const streamUrl = (cfg && cfg.urls && cfg.urls.streamhttp) ? cfg.urls.streamhttp : '';
                 const sseUrl = (cfg && cfg.urls && cfg.urls.sse) ? cfg.urls.sse : '';
-                const displayStream = (function(u){ try { return rewriteHost(u).replace(/\/mcp$/, '/mcp/'); } catch(_) { return rewriteHost(u); } })(streamUrl);
-                const displaySse = rewriteHost(sseUrl || (streamUrl ? streamUrl.replace('/mcp','/sse') : ''));
-                document.getElementById(`url-${serviceId}`).textContent = displayStream || '未获取到URL';
-                document.getElementById(`sse-${serviceId}`).textContent = displaySse || '未获取到URL';
-                const name = cfg && cfg.service_name ? cfg.service_name : (servicesCache[serviceId]?.name || `service-${serviceId}`);
+                // 改为展示本机代理格式：ip:8080/<mcp-name>/mcp 或 /sse
+                const svcName = (cfg && cfg.service_name) ? cfg.service_name : (servicesCache[serviceId]?.name || `service-${serviceId}`);
+                const proxyStream = buildProxyUrl(svcName, '/mcp');
+                const proxySse = buildProxyUrl(svcName, '/sse');
+                document.getElementById(`url-${serviceId}`).textContent = proxyStream || '未获取到URL';
+                document.getElementById(`sse-${serviceId}`).textContent = proxySse || '未获取到URL';
+                const name = svcName;
                 const env = (cfg && cfg.config && cfg.config.env) ? cfg.config.env : (servicesCache[serviceId]?.env_vars || {});
-                const fixedStream = displayStream.endsWith('/mcp') ? (displayStream + '/') : displayStream;
-                const snippetObj = { mcpServers: { [name]: { command: 'mcp-proxy', args: [ displaySse || fixedStream.replace('/mcp/','/sse') ], ...(env && Object.keys(env).length ? { env } : {}) } } };
+                const snippetObj = { mcpServers: { [name]: { command: 'mcp-proxy', args: [ proxySse ], ...(env && Object.keys(env).length ? { env } : {}) } } };
                 document.getElementById(`claude-${serviceId}`).textContent = JSON.stringify(snippetObj, null, 2);
             } catch (e) {
                 document.getElementById(`url-${serviceId}`).textContent = '获取失败';
@@ -596,6 +597,18 @@
                     alert('已复制到剪贴板');
                 } else {
                     // 兼容非安全上下文（http）或Clipboard API不可用
+        function ensureProxyPort() {
+            // 允许后续扩展为后端可配置；当前默认 8080
+            return window.__PROXY_PORT__ || 8080;
+        }
+        function buildProxyUrl(serviceName, suffix) {
+            const host = window.__DISPLAY_HOST__ || location.hostname;
+            const port = ensureProxyPort();
+            const proto = location.protocol || 'http:';
+            const clean = suffix.startsWith('/') ? suffix : ('/' + suffix);
+            return `${proto}//${host}:${port}/${serviceName}${clean}`;
+        }
+
                     const tmp = document.createElement('textarea');
                     tmp.value = text;
                     tmp.style.position = 'fixed';
