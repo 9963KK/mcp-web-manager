@@ -832,7 +832,22 @@
             const action = checked ? 'start' : 'stop';
             const desired = checked ? 'active' : 'inactive';
             const input = document.getElementById(`toggle-${serviceId}`);
-            if (input) input.disabled = true;
+            const label = document.getElementById(`switch-${serviceId}`);
+            const prev = input ? input.checked : checked;
+            // 启动中：保持关闭；停止中：保持开启
+            if (input) {
+                if (checked) input.checked = false; else input.checked = true;
+                input.disabled = true;
+            }
+            if (label) label.classList.add('disabled');
+            // 即时更新胶囊文案与样式
+            (function(){
+                const pill = document.getElementById(`status-${serviceId}`);
+                if (!pill) return;
+                pill.classList.remove('status-active','status-inactive','status-error');
+                pill.classList.add(checked ? 'status-starting' : 'status-stopping');
+                pill.innerHTML = `<span class="dot"></span>${checked ? '启动中' : '停止中'}`;
+            })();
 
             // 辅助：查询状态
             async function fetchStatus() {
@@ -886,6 +901,7 @@
                 alert('网络错误: ' + e.message);
                 if (input) input.checked = !checked;
             } finally {
+                if (label) label.classList.remove('disabled');
                 if (input) input.disabled = false;
             }
         }
