@@ -37,8 +37,7 @@ RUN python -m venv /opt/venv && . /opt/venv/bin/activate && pip install --upgrad
 
 # Copy backend and install via dependencies
 COPY --from=backend-build /app/backend /app/backend
-# Include local mcp-proxy sources to PYTHONPATH at runtime
-COPY mcp-proxy /app/mcp-proxy
+# mcp-proxy sources removed; backend.core is used at runtime
 
 # Copy built frontend
 COPY --from=frontend-build /app/frontend/dist /app/frontend/public/dist
