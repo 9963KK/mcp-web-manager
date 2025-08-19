@@ -135,6 +135,11 @@
             100% { box-shadow: 0 0 0 0 rgba(18,183,106,0); }
         }
 
+        .status-starting { color: #175cd3; background: #eff4ff; border-color: #c7d7fe; }
+        .status-starting .dot { background: #2e90fa; box-shadow: 0 0 0 3px rgba(46,144,250,0.15); }
+        .status-stopping { color: #b54708; background: #fffbeb; border-color: #fed7aa; }
+        .status-stopping .dot { background: #f59e0b; }
+
         .loading {
             text-align: center;
             padding: 2rem;
@@ -469,7 +474,7 @@
                                 </div>
                                 <div class="header-right" onclick="event.stopPropagation();">
                                     <span class="tool-badge" id="tools-${service.id}">-</span>
-                                    <span class="service-status status-${service.status}"><span class="dot"></span>${getStatusText(service.status)}</span>
+                                    <span id="status-${service.id}" class="service-status status-${service.status}"><span class="dot"></span>${getStatusText(service.status)}</span>
                                     <label class="switch ${['starting','stopping'].includes(service.status) ? 'disabled' : ''}" id="switch-${service.id}" title="启动/停止">
                                         <input type="checkbox" id="toggle-${service.id}" ${service.status === 'active' ? 'checked' : ''} ${['starting','stopping'].includes(service.status) ? 'disabled' : ''} onchange="toggleService(${service.id}, this.checked, event)">
                                         <span class="slider"></span>
@@ -834,6 +839,15 @@
                 try {
                     const r = await fetch(`/api/services/${serviceId}/status`);
                     if (!r.ok) return null;
+
+                // 状态胶囊即时反馈：启动/停止中
+                const statusPill = document.getElementById(`status-${serviceId}`);
+                if (statusPill) {
+                    statusPill.classList.remove('status-active','status-inactive','status-error');
+                    statusPill.classList.add(checked ? 'status-starting' : 'status-stopping');
+                    statusPill.innerHTML = `<span class="dot"></span>${checked ? '启动中' : '停止中'}`;
+                }
+
                     const d = await r.json();
                     return (d && d.status) || null;
                 } catch { return null; }
@@ -845,6 +859,9 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action })
                 });
+
+                // 成功或失败后，让后续 loadServices() 统一刷新胶囊最终状态
+
                 const result = await resp.json().catch(() => ({}));
                 if (!resp.ok) {
                     alert('操作失败: ' + (result.detail || '未知错误'));
