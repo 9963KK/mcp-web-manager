@@ -98,14 +98,11 @@
         .btn-secondary { background: #6c757d; }
 
         .service-list { list-style: none; }
-        /* 方案A：服务行网格对齐 */
-        .accordion-header { display:grid; grid-template-columns: 1fr 64px 132px 90px; gap:12px; }
-        .header-left { min-width:0; }
-        .header-right { justify-content:flex-end; }
+        /* 恢复为 flex 布局，避免列裁剪导致胶囊换行 */
         .svc-title { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
         .accordion-item { border: 1px solid #EAECF0; border-radius: 8px; margin-bottom: 10px; overflow: hidden; background: #fff; }
-        .accordion-header { padding: 12px 16px; cursor: pointer; background: #ffffff; }
+        .accordion-header { padding: 12px 16px; cursor: pointer; background: #ffffff; display:flex; align-items:center; justify-content:space-between; }
         .accordion-header:hover { background:#F9FAFB; }
         .svc-icon { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; color:#98a2b3; }
         .svc-icon svg { width:16px; height:16px; fill:none; stroke: currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
@@ -146,6 +143,9 @@
 
         .status-inactive { color: #b42318; background: #fff1f3; border-color: #ffd1d5; }
         .status-inactive .dot { background: #f04438; }
+
+        /* 胶囊更紧凑、固定为单行展示 */
+        .service-status { white-space: nowrap; max-width: 180px; }
 
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(18,183,106,0.35); }
@@ -501,8 +501,12 @@
                                 </div>
                                 <div class="header-right" onclick="event.stopPropagation();">
                                     <span class="tool-badge" id="tools-${service.id}">-</span>
-                                    <span id="status-${service.id}" class="service-status status-${service.status}"><span class="dot"></span>${getStatusText(service.status)}</span>
                                     <label class="switch ${['starting','stopping'].includes(service.status) ? 'disabled' : ''}" id="switch-${service.id}" title="启动/停止">
+                                        <input type="checkbox" id="toggle-${service.id}" ${service.status === 'active' ? 'checked' : ''} ${['starting','stopping'].includes(service.status) ? 'disabled' : ''} onchange="toggleService(${service.id}, this.checked, event)">
+                                        <span class="slider"></span>
+                                    </label>
+                                    <span id="status-${service.id}" class="service-status status-${service.status}"><span class="dot"></span>${getStatusText(service.status)}</span>
+                                    <button class="icon-btn" aria-label="删除" title="删除" onclick="deleteService(${service.id}, '${service.name.replace(/'/g, "\\'")}')">
                                         <input type="checkbox" id="toggle-${service.id}" ${service.status === 'active' ? 'checked' : ''} ${['starting','stopping'].includes(service.status) ? 'disabled' : ''} onchange="toggleService(${service.id}, this.checked, event)">
                                         <span class="slider"></span>
                                     </label>
