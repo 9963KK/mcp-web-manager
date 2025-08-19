@@ -37,8 +37,8 @@ RUN python -m venv /opt/venv && . /opt/venv/bin/activate && pip install --upgrad
 COPY --from=backend-build /app/backend /app/backend
 # mcp-proxy sources removed; backend.core is used at runtime
 
-# Copy built frontend
-COPY --from=frontend-build /app/frontend/dist /app/frontend/public/dist
+# Copy frontend static files into the path backend expects (/app/frontend/public)
+COPY --from=frontend-build /app/frontend/dist/ /app/frontend/public/
 
 # Expose service port
 EXPOSE 8765
