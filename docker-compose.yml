@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   mcp-web-manager:
-    build: .
+    image: 9963kk/mcp-web-manager:latest
     container_name: mcp-web-manager
     ports:
       - "8765:8765"
