@@ -49,6 +49,8 @@
             margin-bottom: 1.5rem;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
+        .card-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
+        .card-actions{display:flex;align-items:center;gap:8px;}
 
         .status-grid {
             display: grid;
@@ -250,14 +252,14 @@
         </div>
 
         <div class="card">
-            <h2>🎛️ 快速操作</h2>
-            <button class="btn" onclick="openJsonModal()">从JSON添加</button>
-            <button class="btn" onclick="refreshData()">刷新数据</button>
-            <button class="btn" onclick="showDocs()">查看API文档</button>
-        </div>
-
-        <div class="card">
-            <h2>📋 服务列表</h2>
+            <div class="card-header">
+                <h2>📋 服务列表</h2>
+                <div class="card-actions">
+                    <button class="btn" onclick="openJsonModal()">从JSON添加</button>
+                    <button class="btn btn-ghost" onclick="refreshData()">刷新</button>
+                    <button class="btn" onclick="showDocs()">API 文档</button>
+                </div>
+            </div>
             <div id="servicesList" class="loading">加载中...</div>
         </div>
 
