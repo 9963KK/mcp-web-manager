@@ -507,10 +507,6 @@
                                     </label>
                                     <span id="status-${service.id}" class="service-status status-${service.status}"><span class="dot"></span>${getStatusText(service.status)}</span>
                                     <button class="icon-btn" aria-label="删除" title="删除" onclick="deleteService(${service.id}, '${service.name.replace(/'/g, "\\'")}')">
-                                        <input type="checkbox" id="toggle-${service.id}" ${service.status === 'active' ? 'checked' : ''} ${['starting','stopping'].includes(service.status) ? 'disabled' : ''} onchange="toggleService(${service.id}, this.checked, event)">
-                                        <span class="slider"></span>
-                                    </label>
-                                    <button class="icon-btn" aria-label="删除" title="删除" onclick="deleteService(${service.id}, '${service.name.replace(/'/g, "\\'")}')">
                                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7H4V5h4V4a1 1 0 0 1 1-1zm1 2v0h4V5h-4zm-3 2v12h10V7H7z"/></svg>
                                     </button>
                                 </div>
