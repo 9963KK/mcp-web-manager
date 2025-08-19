@@ -15,7 +15,7 @@ ENV PIP_NO_CACHE_DIR=1
 WORKDIR /app
 COPY backend/pyproject.toml backend/ ./backend/
 RUN python -m venv /opt/venv && . /opt/venv/bin/activate && pip install --upgrade pip && \
-    python - <<'PY'
+    python - <<'PY' && \
 from pathlib import Path
 import tomllib
 p = tomllib.loads(Path('backend/pyproject.toml').read_text())
@@ -23,7 +23,7 @@ reqs = p.get('project', {}).get('dependencies', [])
 Path('/tmp/reqs.txt').write_text('\n'.join(reqs))
 print('Wrote /tmp/reqs.txt with', len(reqs), 'deps')
 PY
-    && . /opt/venv/bin/activate && pip install --no-cache-dir -r /tmp/reqs.txt
+    . /opt/venv/bin/activate && pip install --no-cache-dir -r /tmp/reqs.txt
 # Copy backend source
 COPY backend /app/backend
 
@@ -51,14 +51,14 @@ ENV PYTHONUNBUFFERED=1 \
     DATABASE_URL=sqlite:////app/backend/mcp_web_manager.db
 
 # Install backend runtime dependencies (from pyproject)
-RUN python - <<'PY'
+RUN python - <<'PY' && \
 from pathlib import Path
 import tomllib, subprocess
 p = tomllib.loads(Path('/app/backend/pyproject.toml').read_text())
 reqs = p.get('project', {}).get('dependencies', [])
 open('/tmp/reqs.txt','w').write('\n'.join(reqs))
 PY
- && . /opt/venv/bin/activate && pip install --no-cache-dir -r /tmp/reqs.txt
+    . /opt/venv/bin/activate && pip install --no-cache-dir -r /tmp/reqs.txt
 
 # Start command
 WORKDIR /app/backend
