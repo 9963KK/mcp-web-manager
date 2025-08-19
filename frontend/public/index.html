@@ -183,6 +183,8 @@
             .switch input:checked + .slider { background: #1e6bff; }
             .switch input:checked + .slider:before { transform: translateX(18px); }
             .switch.disabled { opacity: .6; pointer-events: none; }
+            .switch.disabled .slider { background: #cfd4dc !important; }
+            .switch.disabled .slider:before { transform: translateX(0) !important; }
 
             /* 垃圾桶图标按钮 */
             .icon-btn { border: 1px solid #eee; background: #fff; color: #b42318; padding: 6px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
@@ -854,15 +856,6 @@
                 try {
                     const r = await fetch(`/api/services/${serviceId}/status`);
                     if (!r.ok) return null;
-
-                // 状态胶囊即时反馈：启动/停止中
-                const statusPill = document.getElementById(`status-${serviceId}`);
-                if (statusPill) {
-                    statusPill.classList.remove('status-active','status-inactive','status-error');
-                    statusPill.classList.add(checked ? 'status-starting' : 'status-stopping');
-                    statusPill.innerHTML = `<span class="dot"></span>${checked ? '启动中' : '停止中'}`;
-                }
-
                     const d = await r.json();
                     return (d && d.status) || null;
                 } catch { return null; }
@@ -871,6 +864,10 @@
             try {
                 const resp = await fetch(`/api/services/${serviceId}/action`, {
                     method: 'POST',
+
+                // 仅在用户触发瞬间设置一次"进行中"胶囊，避免轮询中被覆盖闪烁
+                // 轮询完成后，交由 loadServices() 刷新最终态
+
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action })
                 });
