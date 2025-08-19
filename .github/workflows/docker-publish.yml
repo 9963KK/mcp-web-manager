@@ -38,10 +38,15 @@ jobs:
             type=sha
             type=raw,value=latest,enable={{is_default_branch}}
 
+      - name: Show Dockerfile (debug)
+        run: sed -n '1,120p' Dockerfile
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./Dockerfile
+          no-cache: true
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
