@@ -181,11 +181,15 @@
 
             .switch.loading { cursor: progress; }
             .switch.loading .slider { background: #cfd4dc !important; }
-            .switch.loading .slider:before { border: 2px solid rgba(0,0,0,0.25); border-top-color: transparent; background: #fff; animation: spin 0.8s linear infinite; }
+            .switch.loading .slider:before { width: 18px; height: 18px; left: 3px; top: 3px; border-radius: 50%; background: transparent; border: 2px solid #98a2b3; border-top-color: transparent; animation: spin .8s linear infinite; box-shadow: none; }
 
             /* 垃圾桶图标按钮 */
             .icon-btn { border: 1px solid #eee; background: #fff; color: #b42318; padding: 6px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
             .icon-btn:hover { background: #fff1f3; border-color: #ffd1d5; }
+
+            /* 工具数徽标 */
+            .tool-badge { display: none; min-width: 28px; height: 28px; padding: 0 8px; border-radius: 8px; background: #f3f4f6; color: #344054; font-weight: 700; font-size: 13px; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1px #e5e7eb; margin-right: 10px; }
+            .tool-badge.show { display: inline-flex; }
 
         .inline-btn { padding: 0.4rem 0.8rem; font-size: 0.9rem; }
     </style>
@@ -468,6 +472,7 @@
                                     <strong class="svc-title">${service.name}</strong>
                                 </div>
                                 <div class="header-right" onclick="event.stopPropagation();">
+                                    <span class="tool-badge" id="tools-${service.id}">-</span>
                                     <span class="service-status status-${service.status}"><span class="dot"></span>${getStatusText(service.status)}</span>
                                     <label class="switch ${['starting','stopping'].includes(service.status) ? 'disabled' : ''}" id="switch-${service.id}" title="启动/停止">
                                         <input type="checkbox" id="toggle-${service.id}" ${service.status === 'active' ? 'checked' : ''} ${['starting','stopping'].includes(service.status) ? 'disabled' : ''} onchange="toggleService(${service.id}, this.checked, event)">
@@ -479,6 +484,8 @@
                                 </div>
                             </div>
                             <div class="accordion-content" id="svc-${service.id}">
+
+
                                 <div class="content-inner">
                                     <div class="detail-grid">
                                         <div class="detail-label">StreamHTTP（无需本地代理）</div>
@@ -523,6 +530,28 @@
             const status = servicesCache[serviceId]?.status;
             if (status !== 'active') {
                 const urlEl = document.getElementById(`url-${serviceId}`);
+
+                // 渲染后异步更新每行工具数徽标（仅 active 服务显示）
+                services.forEach(svc => {
+                    const badge = document.getElementById(`tools-${svc.id}`);
+                    if (!badge) return;
+                    if (svc.status !== 'active') { badge.classList.remove('show'); badge.textContent = '-'; return; }
+                    badge.classList.add('show');
+                    badge.textContent = '…';
+                    fetch(`/api/services/${svc.id}/tools/count`).then(r => r.json()).then(d => {
+                        if (d && typeof d.count === 'number') {
+                            if (servicesCache[svc.id]?.status === 'active') {
+                                badge.textContent = String(d.count);
+                                badge.classList.add('show');
+                            } else {
+                                badge.classList.remove('show');
+                            }
+                        } else {
+                            badge.classList.remove('show');
+                        }
+                    }).catch(() => { badge.classList.remove('show'); });
+                });
+
                 const sseEl = document.getElementById(`sse-${serviceId}`);
                 const claudeEl = document.getElementById(`claude-${serviceId}`);
                 if (urlEl) urlEl.textContent = '无法获取（服务未运行）';
