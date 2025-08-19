@@ -1,13 +1,11 @@
 # Multi-stage build for MCP Web Manager
 # Runtime: Python backend (FastAPI+Uvicorn) + static frontend
 
-# ---------- Build frontend ----------
+# ---------- Prepare frontend ----------
 FROM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci || npm i
-COPY frontend .
-RUN npm run build
+# 由于项目使用纯 HTML 架构，直接复制静态文件，无需复杂构建
+COPY frontend/public ./dist
 
 # ---------- Build backend (venv) ----------
 FROM python:3.12-slim AS backend-build

@@ -1,9 +1,8 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  root: 'public',  // 设置 public 为根目录
   server: {
     port: 3000,
     proxy: {
@@ -18,7 +17,10 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist',
+    outDir: '../dist',  // 输出到 frontend/dist
     sourcemap: true,
+    rollupOptions: {
+      input: 'index.html'  // 明确指定入口文件
+    }
   },
 })
