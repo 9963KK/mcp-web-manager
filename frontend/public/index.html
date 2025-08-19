@@ -514,6 +514,11 @@
                 // 缓存服务基本信息
                 // servicesCache 由 loadServices 更新
                 // 加载配置
+                // 运行态下：优先立即显示代理地址，再异步拉真实配置（用于env等）
+                const svcNameQuick = servicesCache[serviceId]?.name || `service-${serviceId}`;
+                document.getElementById(`url-${serviceId}`).textContent = buildProxyUrl(svcNameQuick, '/mcp');
+                document.getElementById(`sse-${serviceId}`).textContent = buildProxyUrl(svcNameQuick, '/sse');
+
                 const cfg = await ensureServiceConfig(serviceId);
                     if (servicesCache[serviceId] && servicesCache[serviceId].status !== 'active') {
                         document.getElementById(`url-${serviceId}`).textContent = '无法获取（服务未运行）';
@@ -597,17 +602,6 @@
                     alert('已复制到剪贴板');
                 } else {
                     // 兼容非安全上下文（http）或Clipboard API不可用
-        function ensureProxyPort() {
-            // 允许后续扩展为后端可配置；当前默认 8080
-            return window.__PROXY_PORT__ || 8080;
-        }
-        function buildProxyUrl(serviceName, suffix) {
-            const host = window.__DISPLAY_HOST__ || location.hostname;
-            const port = ensureProxyPort();
-            const proto = location.protocol || 'http:';
-            const clean = suffix.startsWith('/') ? suffix : ('/' + suffix);
-            return `${proto}//${host}:${port}/${serviceName}${clean}`;
-        }
 
                     const tmp = document.createElement('textarea');
                     tmp.value = text;
@@ -649,6 +643,17 @@
         }
 
         // 删除服务
+        function ensureProxyPort() {
+            return window.__PROXY_PORT__ || 8080;
+        }
+        function buildProxyUrl(serviceName, suffix) {
+            const host = window.__DISPLAY_HOST__ || location.hostname;
+            const port = ensureProxyPort();
+            const proto = location.protocol || 'http:';
+            const clean = suffix.startsWith('/') ? suffix : ('/' + suffix);
+            return `${proto}//${host}:${port}/${serviceName}${clean}`;
+        }
+
         async function deleteService(serviceId, name) {
             if (!confirm(`确定要删除服务 “${name}” 吗？`)) return;
             try {
