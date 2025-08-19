@@ -788,8 +788,10 @@
 
         // 显示API文档
         function showDocs() {
+            window.open('/api/docs', '_blank');
+        }
 
-        // 开关事件：封装 start/stop（放在脚本尾部，避免插入混入原函数）
+        // 开关事件：封装 start/stop（全局）
         async function toggleService(serviceId, checked, evt) {
             if (evt) evt.stopPropagation();
             const action = checked ? 'start' : 'stop';
@@ -814,9 +816,6 @@
             } finally {
                 if (input) input.disabled = false;
             }
-        }
-
-            window.open('/api/docs', '_blank');
         }
 
         // 刷新数据
