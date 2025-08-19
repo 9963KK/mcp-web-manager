@@ -795,8 +795,20 @@
         async function toggleService(serviceId, checked, evt) {
             if (evt) evt.stopPropagation();
             const action = checked ? 'start' : 'stop';
+            const desired = checked ? 'active' : 'inactive';
             const input = document.getElementById(`toggle-${serviceId}`);
             if (input) input.disabled = true;
+
+            // 辅助：查询状态
+            async function fetchStatus() {
+                try {
+                    const r = await fetch(`/api/services/${serviceId}/status`);
+                    if (!r.ok) return null;
+                    const d = await r.json();
+                    return (d && d.status) || null;
+                } catch { return null; }
+            }
+
             try {
                 const resp = await fetch(`/api/services/${serviceId}/action`, {
                     method: 'POST',
@@ -809,7 +821,20 @@
                     if (input) input.checked = !checked;
                     return;
                 }
-                setTimeout(() => { loadServices(); loadStats(); }, 500);
+
+                // 轮询等待状态就绪（最多 ~12s）
+                let ok = false;
+                for (let i = 0; i < 20; i++) { // 20 * 600ms ≈ 12s
+                    await new Promise(r => setTimeout(r, 600));
+                    const st = await fetchStatus();
+                    if (st === desired) { ok = true; break; }
+                }
+                if (!ok) {
+                    if (input) input.checked = !checked;
+                    alert('操作已发送，但服务状态未就绪，请稍后再试或查看日志');
+                }
+                loadServices();
+                loadStats();
             } catch (e) {
                 alert('网络错误: ' + e.message);
                 if (input) input.checked = !checked;
