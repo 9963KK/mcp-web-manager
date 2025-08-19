@@ -19,6 +19,8 @@ export default defineConfig({
   build: {
     outDir: '../dist',  // 输出到 frontend/dist
     sourcemap: true,
-    emptyOutDir: true,
+    rollupOptions: {
+      input: 'index.html'  // 明确指定入口文件
+    }
   },
 })
