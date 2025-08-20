@@ -234,24 +234,21 @@ async def get_service_proxy_instances(
 
 @router.get("/{service_id}/tools/count")
 async def get_service_tools_count(service_id: int, db: Session = Depends(get_db)):
-    """返回运行中服务的工具数量（通过StreamHTTP实时探测）。
+    """探测服务包含的工具数量（通过StreamHTTP实时探测）。
 
-    - 仅在服务处于 active 且存在活跃代理实例时尝试探测
+    - 只要存在活跃代理实例即可尝试探测（不再强依赖 service.status == 'active'）
     - 如库依赖缺失或探测失败，返回详细错误信息，便于前端降级
     """
     service = service_crud.get_by_id(db, service_id)
     if not service:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="服务不存在")
 
-    # 仅在运行中才探测
-    if getattr(service, "status", None) != "active":
-        return {"count": 0, "status": service.status, "message": "服务未运行"}
-
-    # 选择最新活跃实例
+    # 选择最新活跃实例（只要有活跃实例就尝试探测，不再强依赖 service.status == 'active'）
     instances = proxy_instance_crud.get_by_service(db, service_id)
     active = [inst for inst in instances if getattr(inst, "is_active", False)]
     if not active:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="无活跃代理实例")
+        # 无活跃实例：保持与旧逻辑一致的提示
+        return {"count": 0, "status": service.status, "message": "无活跃代理实例或服务未运行"}
     inst = max(active, key=lambda x: x.id)
     # 如果实例记录的 host 是 0.0.0.0（对外绑定），在容器内实际探测应使用 127.0.0.1 访问
     target_host = getattr(inst, 'host', '127.0.0.1')
