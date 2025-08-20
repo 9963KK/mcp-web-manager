@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 
 from database import init_database
 from api import services_router, config_router, dashboard_router, proxy_router
+from api.runtime import router as runtime_router
 from services.mcp_manager import mcp_service_manager
 from websocket import websocket_endpoint
 
@@ -98,6 +99,9 @@ def create_app() -> FastAPI:
 
     # 统一域名下的反向代理：/{name}/mcp 与 /{name}/sse
     app.include_router(proxy_router, tags=["proxy"])
+
+    # 运行期维护端点：清理缓存/可选停止服务
+    app.include_router(runtime_router)
 
     # 注册WebSocket端点
     app.websocket("/ws")(websocket_endpoint)
