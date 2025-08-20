@@ -253,7 +253,11 @@ async def get_service_tools_count(service_id: int, db: Session = Depends(get_db)
     if not active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="无活跃代理实例")
     inst = max(active, key=lambda x: x.id)
-    base = f"http://{getattr(inst, 'host', '127.0.0.1')}:{inst.port}"
+    # 如果实例记录的 host 是 0.0.0.0（对外绑定），在容器内实际探测应使用 127.0.0.1 访问
+    target_host = getattr(inst, 'host', '127.0.0.1')
+    if target_host in ("0.0.0.0", "::"):
+        target_host = "127.0.0.1"
+    base = f"http://{target_host}:{inst.port}"
     candidate_urls = [f"{base}/mcp", f"{base}/mcp/"]  # 某些实现只接受带/，做容错
 
     try:
