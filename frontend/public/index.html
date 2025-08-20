@@ -304,6 +304,15 @@
             } catch { return null; }
         }
 
+        async function fetchToolsCountWithRetry(id, attempts = 4, delayMs = 600) {
+            for (let i = 0; i < attempts; i++) {
+                const c = await fetchToolsCount(id);
+                if (c != null) return c;
+                await sleep(delayMs);
+            }
+            return null;
+        }
+
         async function maybeFetchToolsCount(svc) {
             const badge = document.getElementById(`tools-${svc.id}`);
             if (!badge) return;
@@ -324,11 +333,11 @@
                 badge.textContent = String(cached.count);
             }
 
-            // 仅在“刚变为 active”时请求一次，避免列表频繁刷新导致的抖动
+            // 仅在“刚变为 active”时请求，增加短暂重试避免刚启动时工具探测 502
             if (prev !== 'active') {
                 badge.classList.add('show');
                 if (!cached) badge.textContent = '…';
-                const c = await fetchToolsCount(svc.id);
+                const c = await fetchToolsCountWithRetry(svc.id, 4, 700);
                 badge.textContent = (c != null) ? String(c) : '—';
                 if (c != null) toolCountCache.set(svc.id, { count: c, ts: Date.now() });
             }
@@ -955,7 +964,7 @@
                     alert('操作已发送，但服务状态未就绪，请稍后再试或查看日志');
                 }
                 loadServices();
-                    // 若目标状态为 active，补充刷新该服务的工具数（避免等待全量刷新）
+                    // 若目标状态为 active，补充刷新该服务的工具数（避免等待时序 502）
                     if (desired === 'active') {
                         // 先更新状态记忆，再请求一次（防止 maybeFetch 条件不触发）
                         lastStatusMap.set(serviceId, 'inactive');
