@@ -26,28 +26,6 @@ python start_backend.py
 
 服务将运行在 `http://localhost:8765`
 
-### 方式二：Docker部署
-
-```bash
-# 构建镜像
-docker build -t mcp-web-manager .
-
-# 运行容器
-docker run -p 8765:8765 mcp-web-manager
-```
-
-### 方式三：Docker Compose部署（推荐）
-
-```bash
-# 启动服务
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-
-# 停止服务
-docker-compose down
-```
 
 访问 `http://localhost:8765` 即可使用Web管理界面。
 
@@ -77,8 +55,6 @@ mcp-web-manager/
 ├── frontend/                   # 前端代码
 │   └── public/                 # 静态文件
 │       └── index.html          # Web界面
-├── docker-compose.yml          # Docker Compose配置
-├── Dockerfile                  # Docker镜像配置
 └── start_backend.py           # 启动脚本
 ```
 

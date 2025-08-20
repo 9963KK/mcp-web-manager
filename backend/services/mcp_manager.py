@@ -103,9 +103,8 @@ class MCPServiceManager:
             service_crud.update_status(db, service.id, ServiceStatus.STARTING, "正在启动服务...")
             
             # 以外部 mcp-proxy 进程运行，默认服务器路由为 /mcp 与 /sse
-            bind_host = (
-                service.streamhttp_host if service.streamhttp_host not in ("127.0.0.1", "localhost") else "0.0.0.0"
-            )
+            # 容器内稳定性与安全起见，统一绑定到 127.0.0.1，仅供主进程内部访问
+            bind_host = "127.0.0.1"
             # 使用 python -m backend.core 直接运行后端内置核心（不再依赖 mcp-proxy/src）
             python_exec = sys.executable or shutil.which("python3") or "python3"
             base_cmd: List[str] = [
@@ -137,49 +136,11 @@ class MCPServiceManager:
                 cwd=working_dir,
                 env=env,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,  # 捕获错误便于失败时诊断
+                stderr=subprocess.DEVNULL,
             )
 
             # 等待端口开放（缩短超时至 3s）
             await self._wait_port_open("127.0.0.1", port, timeout=3.0)
-
-            # 二次校验端口是否真的打开，否则视为启动失败并进行清理
-            def _port_really_open(h: str, p: int) -> bool:
-                import socket
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                    sock.settimeout(0.2)
-                    try:
-                        return sock.connect_ex((h, p)) == 0
-                    except Exception:
-                        return False
-
-            if not _port_really_open("127.0.0.1", port):
-                # 读取少量 stderr 作为提示
-                err_snippet = ""
-                try:
-                    if process.stderr:
-                        err_snippet = process.stderr.read(2048).decode("utf-8", "ignore")
-                except Exception:
-                    pass
-
-                try:
-                    if process.poll() is None:
-                        process.terminate()
-                        try:
-                            process.wait(timeout=1)
-                        except subprocess.TimeoutExpired:
-                            process.kill()
-
-                finally:
-                    self.port_manager.release_port(port)
-
-                message = (
-                    f"代理核心未启动，可能命令不可用或启动失败: '{service.command}'. "
-                    f"stderr: {err_snippet.strip()[:500]}"
-                )
-                logger.error("%s", message)
-                service_crud.update_status(db, service.id, ServiceStatus.ERROR, message)
-                return False, message
 
             # 记录运行信息
             service_info = {
@@ -190,12 +151,12 @@ class MCPServiceManager:
                 "base_path": "",
                 "started_at": datetime.now(),
             }
-
+            
             self.running_services[service.id] = service_info
-
-            # 创建代理实例记录
-            sse_url = f"http://{service.streamhttp_host}:{port}/sse"
-            streamhttp_url = f"http://{service.streamhttp_host}:{port}/mcp"
+            
+            # 创建代理实例记录（统一记录为 127.0.0.1）
+            sse_url = f"http://127.0.0.1:{port}/sse"
+            streamhttp_url = f"http://127.0.0.1:{port}/mcp"
 
             proxy_instance_crud.create(
                 db=db,
@@ -203,7 +164,7 @@ class MCPServiceManager:
                 sse_url=sse_url,
                 streamhttp_url=streamhttp_url,
                 port=port,
-                host=service.streamhttp_host,
+                host="127.0.0.1",
                 is_active=True,
                 stateless=False,
                 allow_origins=["*"],
@@ -213,15 +174,15 @@ class MCPServiceManager:
             # 更新服务状态
             service.streamhttp_port = port
             service_crud.update_status(db, service.id, ServiceStatus.ACTIVE, f"服务已启动，端口: {port}")
-
+            
             # 广播服务启动事件
             broadcaster = get_event_broadcaster()
             if broadcaster:
                 asyncio.create_task(broadcaster.service_started(service.id, service.name, port))
-
+            
             logger.info(f"Service {service.name} started on port {port} (external mcp-proxy pid={process.pid})")
             return True, f"服务已成功启动，端口: {port}"
-
+            
         except Exception as e:
             logger.error(f"Failed to start service {service.name}: {e}")
             # 清理资源

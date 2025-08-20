@@ -733,12 +733,19 @@
         // 将 URL 的主机名替换为后端提供的展示主机（优先外网），避免复制到 127.0.0.1
         async function ensureDisplayHost() {
             if (window.__DISPLAY_HOST__) return window.__DISPLAY_HOST__;
+            const LOCAL_FALLBACK = '127.0.0.1';
             try {
                 const r = await fetch('/api/system/display-host');
                 const j = await r.json();
-                window.__DISPLAY_HOST__ = (j && j.host) ? j.host : location.hostname;
+                // 在容器内无法可靠识别云端 IP 时，一律回退到 127.0.0.1
+                if (!j || !j.host || j.source === 'local_default' || ['localhost','127.0.0.1',''].includes(j.host)) {
+                    window.__DISPLAY_HOST__ = LOCAL_FALLBACK;
+                } else {
+                    window.__DISPLAY_HOST__ = j.host;
+                }
             } catch (_) {
-                window.__DISPLAY_HOST__ = location.hostname;
+                // 后端不可达或异常时，直接使用 127.0.0.1，避免复制出不可用的外网/内网主机名
+                window.__DISPLAY_HOST__ = LOCAL_FALLBACK;
             }
             return window.__DISPLAY_HOST__;
         }

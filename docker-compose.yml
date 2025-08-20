@@ -1,15 +1,23 @@
 version: "3.8"
 services:
   mcp-web-manager:
-    image: 9963kk/mcp-web-manager:latest
+    build: .
+    image: mcp-web-manager:stable
     container_name: mcp-web-manager
     ports:
       - "8765:8765"
     environment:
       - DATABASE_URL=sqlite:////data/mcp_web_manager.db
+      # 可选：强制前端复制链接使用固定主机名（否则按逻辑回退到 127.0.0.1）
+      # - PUBLIC_HOST=your.domain.com
     volumes:
       - mcpwm-data:/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=2).status==200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   mcpwm-data:

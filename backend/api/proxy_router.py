@@ -51,8 +51,11 @@ def _resolve_active_instance_by_name(name: str) -> dict[str, Any] | None:
         if not active:
             return None
         inst = max(active, key=lambda x: x.id)
+        host = getattr(inst, "host", "127.0.0.1")
+        if host in ("0.0.0.0", "::"):
+            host = "127.0.0.1"
         return {
-            "host": getattr(inst, "host", "127.0.0.1"),
+            "host": host,
             "port": inst.port,
         }
     finally:
@@ -95,7 +98,10 @@ async def proxy_streamable_http(name: str, request: Request, tail: str = "") -> 
     target = _resolve_active_instance_by_name(name)
     if not target:
         return PlainTextResponse("Service not found or inactive", status_code=503)
-    target_base = f"http://{target['host']}:{target['port']}/mcp"
+    host = target['host']
+    if host in ("0.0.0.0", "::"):
+        host = "127.0.0.1"
+    target_base = f"http://{host}:{target['port']}/mcp"
     return await _forward_streamable_http(request, target_base, f"/{tail}" if tail else "")
 
 
@@ -106,7 +112,10 @@ async def proxy_sse(name: str, request: Request) -> Response:
     if not target:
         return PlainTextResponse("Service not found or inactive", status_code=503)
 
-    url = f"http://{target['host']}:{target['port']}/sse"
+    host = target['host']
+    if host in ("0.0.0.0", "::"):
+        host = "127.0.0.1"
+    url = f"http://{host}:{target['port']}/sse"
 
     async def _event_stream() -> asyncio.AsyncIterator[bytes]:
         async with httpx.AsyncClient(timeout=None) as client:
@@ -140,7 +149,10 @@ async def proxy_sse_messages(name: str, request: Request, path: str = "") -> Res
         return PlainTextResponse("Service not found or inactive", status_code=503)
 
     # Always keep trailing slash for base '/messages/' on internal server
-    base = f"http://{target['host']}:{target['port']}/messages/"
+    host = target['host']
+    if host in ("0.0.0.0", "::"):
+        host = "127.0.0.1"
+    base = f"http://{host}:{target['port']}/messages/"
     url = f"{base}{path}" if path else base
     if qs:
         url = f"{url}?{qs}"
@@ -170,6 +182,8 @@ async def proxy_sse_messages_root(request: Request, path: str = "") -> Response:
     base_tail = f"{path}" if path else ""
 
     async def _forward_to(host: str, port: int) -> Response:
+        if host in ("0.0.0.0", "::"):
+            host = "127.0.0.1"
         base = f"http://{host}:{port}/messages/"
         url = f"{base}{base_tail}"
         url = f"{url}?{qs}" if qs else url
