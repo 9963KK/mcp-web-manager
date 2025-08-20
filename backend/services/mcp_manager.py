@@ -142,6 +142,24 @@ class MCPServiceManager:
             # 等待端口开放（缩短超时至 3s）
             await self._wait_port_open("127.0.0.1", port, timeout=3.0)
 
+            # 进一步等待后端就绪：探测 /status 是否可返回JSON（最多 ~1.5s）
+            try:
+                import urllib.request, json, time
+                ready_ok = False
+                for _ in range(3):
+                    try:
+                        with urllib.request.urlopen(f"http://127.0.0.1:{port}/status", timeout=0.5) as resp:
+                            if resp.status == 200:
+                                json.load(resp)  # ensure JSON parse ok
+                                ready_ok = True
+                                break
+                    except Exception:
+                        time.sleep(0.5)
+                if not ready_ok:
+                    logger.info("Service port %s open but /status not ready; continuing", port)
+            except Exception:
+                pass
+
             # 记录运行信息
             service_info = {
                 "process": process,

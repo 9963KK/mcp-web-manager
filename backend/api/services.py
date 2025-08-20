@@ -281,15 +281,19 @@ async def get_service_tools_count(service_id: int, db: Session = Depends(get_db)
                     return 0
 
     last_err: Exception | None = None
-    for u in candidate_urls:
-        try:
-            count = await asyncio.wait_for(_probe_tools_count(u), timeout=4.0)
-            return {"count": int(count), "status": service.status}
-        except asyncio.TimeoutError as e:
-            last_err = e
-        except Exception as e:  # noqa: BLE001
-            last_err = e
-            continue
+    # 短暂重试，缓解刚启动的瞬时抖动（总计 ~2.5s）
+    for _ in range(2):
+        for u in candidate_urls:
+            try:
+                count = await asyncio.wait_for(_probe_tools_count(u), timeout=4.0)
+                return {"count": int(count), "status": service.status}
+            except asyncio.TimeoutError as e:
+                last_err = e
+            except Exception as e:  # noqa: BLE001
+                last_err = e
+                continue
+        # 小睡片刻再试
+        await asyncio.sleep(0.5)
 
     # 全部失败
     if isinstance(last_err, asyncio.TimeoutError):
