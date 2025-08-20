@@ -1,14 +1,15 @@
 version: "3.8"
 services:
   mcp-web-manager:
-    build: .
-    image: mcp-web-manager:stable
-    container_name: mcp-web-manager
+    image: 9963kk/mcp-web-manager:latest
+    pull_policy: always
+    # 如需在 ARM 机器上强制拉取 amd64 镜像，可取消下一行注释
+    # platform: linux/amd64
     ports:
       - "8765:8765"
     environment:
       - DATABASE_URL=sqlite:////data/mcp_web_manager.db
-      # 可选：强制前端复制链接使用固定主机名（否则按逻辑回退到 127.0.0.1）
+      # 复制链接展示使用的外网主机名；如不设置将自动回退 127.0.0.1
       # - PUBLIC_HOST=your.domain.com
     volumes:
       - mcpwm-data:/data
