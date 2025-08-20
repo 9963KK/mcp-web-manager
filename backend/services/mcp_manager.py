@@ -142,23 +142,44 @@ class MCPServiceManager:
             # 等待端口开放（缩短超时至 3s）
             await self._wait_port_open("127.0.0.1", port, timeout=3.0)
 
-            # 进一步等待后端就绪：探测 /status 是否可返回JSON（最多 ~1.5s）
+            # 等待 MCP 协议真正就绪：尝试建立会话并 list_tools（最多 ~4s）
+            mcp_ready = False
             try:
-                import urllib.request, json, time
-                ready_ok = False
-                for _ in range(3):
+                import time
+                for attempt in range(8):  # 8 * 0.5s = 4s max
                     try:
-                        with urllib.request.urlopen(f"http://127.0.0.1:{port}/status", timeout=0.5) as resp:
-                            if resp.status == 200:
-                                json.load(resp)  # ensure JSON parse ok
-                                ready_ok = True
-                                break
+                        # 使用内部 MCP 客户端做最小化握手测试
+                        from mcp.client.streamable_http import StreamableHTTPTransport
+                        import asyncio
+
+                        async def _test_mcp_ready():
+                            transport = StreamableHTTPTransport(f"http://127.0.0.1:{port}/mcp")
+                            try:
+                                await transport.connect()
+                                # 尝试 list_tools（这是 tools/count 的核心操作）
+                                result = await transport.call_rpc("tools/list", {})
+                                return True
+                            except Exception:
+                                return False
+                            finally:
+                                try:
+                                    await transport.close()
+                                except Exception:
+                                    pass
+
+                        # 在当前事件循环中测试
+                        if await _test_mcp_ready():
+                            mcp_ready = True
+                            logger.info("MCP protocol ready on port %s", port)
+                            break
                     except Exception:
-                        time.sleep(0.5)
-                if not ready_ok:
-                    logger.info("Service port %s open but /status not ready; continuing", port)
-            except Exception:
-                pass
+                        pass
+                    time.sleep(0.5)
+
+                if not mcp_ready:
+                    logger.warning("MCP protocol not ready on port %s after 4s, continuing anyway", port)
+            except Exception as e:
+                logger.warning("MCP readiness check failed: %s, continuing", e)
 
             # 记录运行信息
             service_info = {
