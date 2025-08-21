@@ -281,10 +281,12 @@ async def _probe_tools_count_for_service(service_id: int, db: Session) -> int:
     try:
         from mcp.client.session import ClientSession  # type: ignore
         from mcp.client.streamable_http import streamablehttp_client  # type: ignore
+        from mcp.client.streamable_http import StreamableHTTPTransport  # type: ignore
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"MCP客户端依赖缺失: {e}") from e
 
-    async def _probe(target_url: str) -> int:
+    async def _probe_high(target_url: str) -> int:
+        """优先使用高级客户端会话进行探测。"""
         async with streamablehttp_client(url=target_url) as (read, write, _):
             async with ClientSession(read, write) as session:
                 await session.initialize()
@@ -294,12 +296,35 @@ async def _probe_tools_count_for_service(service_id: int, db: Session) -> int:
                 except Exception:
                     return 0
 
+    async def _probe_fallback(target_url: str) -> int:
+        """降级方案：直接用底层 Transport 调用 tools/list。"""
+        transport = StreamableHTTPTransport(target_url)
+        try:
+            await transport.connect()
+            result = await transport.call_rpc("tools/list", {})
+            # 兼容多种结构：{"tools": [...] } 或 直接列表
+            try:
+                arr = result.get("tools") if isinstance(result, dict) else result
+                return len(arr or [])
+            except Exception:
+                return 0
+        finally:
+            try:
+                await transport.close()
+            except Exception:
+                pass
+
     import asyncio
     last_err: Exception | None = None
     for _ in range(2):
         for u in candidate_urls:
             try:
-                c = await asyncio.wait_for(_probe(u), timeout=3.5)
+                # 先高层，失败则尝试降级
+                try:
+                    c = await asyncio.wait_for(_probe_high(u), timeout=3.5)
+                except Exception as e_high:  # noqa: BLE001
+                    last_err = e_high
+                    c = await asyncio.wait_for(_probe_fallback(u), timeout=3.5)
                 tools_cache.set_count(service_id, int(c))
                 # 广播到前端
                 try:

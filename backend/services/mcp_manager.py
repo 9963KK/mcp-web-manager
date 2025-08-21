@@ -226,15 +226,28 @@ class MCPServiceManager:
             # 更新服务状态
             service.streamhttp_port = port
             service_crud.update_status(db, service.id, ServiceStatus.ACTIVE, f"服务已启动，端口: {port}")
-            
+
             # 广播服务启动事件
             broadcaster = get_event_broadcaster()
             if broadcaster:
                 asyncio.create_task(broadcaster.service_started(service.id, service.name, port))
-            
+
+            # 预热工具数量（后台）：避免首屏等待，成功则广播 tools_count
+            async def _warmup_tools_count(svc_id: int):
+                from database import SessionLocal as _SL
+                from api.services import _probe_tools_count_for_service as _probe
+                local_db = _SL()
+                try:
+                    await _probe(svc_id, local_db)
+                except Exception:
+                    pass
+                finally:
+                    local_db.close()
+            asyncio.create_task(_warmup_tools_count(service.id))
+
             logger.info(f"Service {service.name} started on port {port} (external mcp-proxy pid={process.pid})")
             return True, f"服务已成功启动，端口: {port}"
-            
+
         except Exception as e:
             logger.error(f"Failed to start service {service.name}: {e}")
             # 清理资源
