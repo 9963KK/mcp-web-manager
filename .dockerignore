@@ -52,6 +52,16 @@ logs/
 # Node modules (if any)
 node_modules/
 
+**/node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/src/
+frontend/.vite-cache/
+
+# CI/config noise not needed in build context
+.github/
+.promptx/
+
 # Temporary files
 tmp/
 temp/
