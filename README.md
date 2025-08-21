@@ -9,7 +9,7 @@
 ## 主要功能
 
 - 🌐 **Web界面管理**: 通过浏览器管理所有MCP服务
-- 📊 **实时监控**: 查看服务状态、运行统计和性能指标  
+- 📊 **实时监控**: 查看服务状态、运行统计和性能指标
 - 🔧 **一键操作**: 启动、停止、重启服务，支持批量导入
 - 📋 **配置导出**: 自动生成Claude Desktop等客户端配置
 - 🚀 **协议转换**: 将stdio格式转换为SSE和StreamHTTP格式
@@ -28,6 +28,46 @@ python start_backend.py
 
 
 访问 `http://localhost:8765` 即可使用Web管理界面。
+
+
+### 方式二：Docker 部署
+
+- 使用已发布镜像（推荐）
+
+```bash
+docker run -d --name mcp-web-manager \
+  -p 8765:8765 \
+  -e DATABASE_URL=sqlite:////data/mcp_web_manager.db \
+  -v mcpwm-data:/data \
+  --restart unless-stopped \
+  9963kk/mcp-web-manager:latest
+```
+
+- 或使用 docker compose（仓库自带 docker-compose.yml）
+
+```bash
+docker compose up -d
+```
+
+服务将运行在 http://localhost:8765
+
+可选环境变量：
+- PUBLIC_HOST：用于复制链接时展示的外网主机名（例如 your.domain.com）
+- DATABASE_URL：数据库连接串，默认 sqlite:////data/mcp_web_manager.db（已映射到容器内 /data）
+
+数据持久化：
+- 通过卷 mcpwm-data 将 SQLite 数据库持久化到宿主机
+
+从源码本地构建镜像：
+
+```bash
+docker build -t mcp-web-manager:local .
+docker run -d --name mcpwm -p 8765:8765 -v mcpwm-data:/data mcp-web-manager:local
+```
+
+注意（性能说明）：
+- Docker 部署下，获取 MCP 工具数量统计会较慢，无法与服务启动同步显示；通常需等待一段时间（取决于容器内依赖冷启动与网络环境）后逐步补齐。
+- 若希望更快的体验，当前最推荐的依然是“方式一：Python 脚本启动”。
 
 ## 使用说明
 
