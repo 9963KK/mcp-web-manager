@@ -828,8 +828,19 @@
         // 处理服务事件
         function handleServiceEvent(message) {
             console.log('Service event:', message);
-            loadServices(); // 重新加载服务列表
-            loadStats(); // 重新加载统计信息
+            if (message.event === 'tools_count' && message.service_id && message.data && typeof message.data.count === 'number') {
+                const sid = message.service_id;
+                const c = message.data.count;
+                toolCountCache.set(sid, { count: c, ts: Date.now() });
+                const badge = document.getElementById(`tools-${sid}`);
+                if (badge) {
+                    badge.classList.add('show');
+                    badge.textContent = String(c);
+                }
+                return; // 不触发全量刷新
+            }
+            loadServices(); // 其他事件仍保持当前策略
+            loadStats();
         }
 
         // 管理服务（按钮级加载动画 + 后端异步指令）

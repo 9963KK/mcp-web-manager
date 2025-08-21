@@ -19,6 +19,8 @@ from schemas import (
     ImportResultResponse,
 )
 from services.mcp_manager import mcp_service_manager
+from services import tools_cache
+from websocket import event_broadcaster
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
@@ -236,66 +238,102 @@ async def get_service_proxy_instances(
 async def get_service_tools_count(service_id: int, db: Session = Depends(get_db)):
     """探测服务包含的工具数量（通过StreamHTTP实时探测）。
 
-    - 只要存在活跃代理实例即可尝试探测（不再强依赖 service.status == 'active'）
-    - 如库依赖缺失或探测失败，返回详细错误信息，便于前端降级
+    优化：
+    - 增加进程内缓存，优先返回最近结果；过期则后台刷新
+    - 成功探测后通过 WebSocket 广播，前端收到后更新并缓存
+    - 只要存在活跃代理实例即可尝试探测
     """
     service = service_crud.get_by_id(db, service_id)
     if not service:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="服务不存在")
 
-    # 选择最新活跃实例（只要有活跃实例就尝试探测，不再强依赖 service.status == 'active'）
+    # 无活跃实例：直接返回 0
     instances = proxy_instance_crud.get_by_service(db, service_id)
     active = [inst for inst in instances if getattr(inst, "is_active", False)]
     if not active:
-        # 无活跃实例：保持与旧逻辑一致的提示
         return {"count": 0, "status": service.status, "message": "无活跃代理实例或服务未运行"}
+
+    # 命中缓存则快速返回，同时异步触发一次后台刷新（避免频繁阻塞）
+    cached = tools_cache.get_count(service_id)
+    if isinstance(cached, int):
+        # 后台刷新（轻量重试）
+        asyncio.create_task(_refresh_tools_count_background(service_id, db))
+        return {"count": cached, "status": service.status, "cached": True}
+
+    # 未命中缓存：执行一次探测，探测成功即缓存并广播
+    count = await _probe_tools_count_for_service(service_id, db)
+    return {"count": count, "status": service.status, "cached": False}
+
+
+async def _probe_tools_count_for_service(service_id: int, db: Session) -> int:
+    """执行实际探测并写入缓存，失败抛出 HTTPException。"""
+    service = service_crud.get_by_id(db, service_id)
+    instances = proxy_instance_crud.get_by_service(db, service_id)
+    active = [inst for inst in instances if getattr(inst, "is_active", False)]
     inst = max(active, key=lambda x: x.id)
-    # 如果实例记录的 host 是 0.0.0.0（对外绑定），在容器内实际探测应使用 127.0.0.1 访问
+
     target_host = getattr(inst, 'host', '127.0.0.1')
     if target_host in ("0.0.0.0", "::"):
         target_host = "127.0.0.1"
     base = f"http://{target_host}:{inst.port}"
-    candidate_urls = [f"{base}/mcp/"]  # 统一使用带尾斜杠，减少 307 重定向
+    candidate_urls = [f"{base}/mcp/"]
 
     try:
-        # 动态导入，避免环境无依赖时报错影响其他接口
         from mcp.client.session import ClientSession  # type: ignore
         from mcp.client.streamable_http import streamablehttp_client  # type: ignore
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"MCP客户端依赖缺失: {e}") from e
 
-    import asyncio
-
-    async def _probe_tools_count(target_url: str) -> int:
+    async def _probe(target_url: str) -> int:
         async with streamablehttp_client(url=target_url) as (read, write, _):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 tools = await session.list_tools()
-                # tools 可能是对象或普通列表，尽量兼容
                 try:
                     return len(getattr(tools, "tools", tools) or [])
-                except Exception:  # noqa: BLE001
+                except Exception:
                     return 0
 
+    import asyncio
     last_err: Exception | None = None
-    # 短暂重试，缓解刚启动的瞬时抖动（总计 ~2.5s）
     for _ in range(2):
         for u in candidate_urls:
             try:
-                count = await asyncio.wait_for(_probe_tools_count(u), timeout=4.0)
-                return {"count": int(count), "status": service.status}
+                c = await asyncio.wait_for(_probe(u), timeout=3.5)
+                tools_cache.set_count(service_id, int(c))
+                # 广播到前端
+                try:
+                    await event_broadcaster.broadcast_service_event(
+                        "tools_count",
+                        service_id,
+                        {"count": int(c)}
+                    )
+                except Exception:
+                    pass
+                return int(c)
             except asyncio.TimeoutError as e:
                 last_err = e
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 last_err = e
                 continue
-        # 小睡片刻再试
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.4)
 
-    # 全部失败
     if isinstance(last_err, asyncio.TimeoutError):
         raise HTTPException(status_code=504, detail="探测工具数超时")
     raise HTTPException(status_code=502, detail=f"探测工具数失败: {last_err}")
+
+
+async def _refresh_tools_count_background(service_id: int, db: Session) -> None:
+    """后台刷新工具数：使用独立的 DB 会话，防止当前请求阻塞。"""
+    try:
+        local_db = SessionLocal()
+        try:
+            await _probe_tools_count_for_service(service_id, local_db)
+        finally:
+            local_db.close()
+    except Exception:
+        # 静默失败，保持缓存值
+        pass
 
 
 @router.post("/import", response_model=ImportResultResponse)
