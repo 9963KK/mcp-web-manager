@@ -260,9 +260,15 @@ async def get_service_tools_count(service_id: int, db: Session = Depends(get_db)
         asyncio.create_task(_refresh_tools_count_background(service_id, db))
         return {"count": cached, "status": service.status, "cached": True}
 
-    # 未命中缓存：执行一次探测，探测成功即缓存并广播
-    count = await _probe_tools_count_for_service(service_id, db)
-    return {"count": count, "status": service.status, "cached": False}
+    # 未命中缓存：执行一次探测。容器冷启动或后端不可达时，降级返回0，避免前端报错
+    try:
+        count = await _probe_tools_count_for_service(service_id, db)
+        return {"count": count, "status": service.status, "cached": False}
+    except HTTPException as e:
+        # 502/504 等网络类错误：返回可用的降级结果，附带错误信息
+        if e.status_code in (502, 503, 504):
+            return {"count": 0, "status": service.status, "cached": False, "error": str(e.detail)}
+        raise
 
 
 async def _probe_tools_count_for_service(service_id: int, db: Session) -> int:
@@ -345,6 +351,7 @@ async def _probe_tools_count_for_service(service_id: int, db: Session) -> int:
 
     if isinstance(last_err, asyncio.TimeoutError):
         raise HTTPException(status_code=504, detail="探测工具数超时")
+    # 保留 502 以便调用方区分网络/协议类错误
     raise HTTPException(status_code=502, detail=f"探测工具数失败: {last_err}")
 
 
