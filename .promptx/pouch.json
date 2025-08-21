@@ -1,42 +1,17 @@
 {
-  "currentState": "service_discovery",
+  "currentState": "initialized",
   "stateHistory": [
     {
       "from": "initial",
       "command": "init",
-      "timestamp": "2025-08-19T05:49:58.418Z",
+      "timestamp": "2025-08-21T02:52:57.956Z",
       "args": [
         {
           "workingDirectory": "/root/mcp-web-manager",
           "ideType": "vscode"
         }
       ]
-    },
-    {
-      "from": "initialized",
-      "command": "action",
-      "timestamp": "2025-08-19T05:50:05.856Z",
-      "args": [
-        "assistant"
-      ]
-    },
-    {
-      "from": "role_activated_with_memory",
-      "command": "init",
-      "timestamp": "2025-08-19T07:05:09.626Z",
-      "args": [
-        {
-          "workingDirectory": "/root/mcp-web-manager",
-          "ideType": "vscode"
-        }
-      ]
-    },
-    {
-      "from": "initialized",
-      "command": "welcome",
-      "timestamp": "2025-08-19T07:05:15.743Z",
-      "args": []
     }
   ],
-  "lastUpdated": "2025-08-19T07:05:15.756Z"
+  "lastUpdated": "2025-08-21T02:52:57.983Z"
 }
