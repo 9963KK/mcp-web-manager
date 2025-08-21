@@ -255,7 +255,7 @@ async def get_service_tools_count(service_id: int, db: Session = Depends(get_db)
     if target_host in ("0.0.0.0", "::"):
         target_host = "127.0.0.1"
     base = f"http://{target_host}:{inst.port}"
-    candidate_urls = [f"{base}/mcp", f"{base}/mcp/"]  # 某些实现只接受带/，做容错
+    candidate_urls = [f"{base}/mcp/"]  # 统一使用带尾斜杠，减少 307 重定向
 
     try:
         # 动态导入，避免环境无依赖时报错影响其他接口

@@ -333,10 +333,10 @@
                 badge.textContent = String(cached.count);
             }
 
-            // 仅在“刚变为 active”时请求，增加短暂重试避免刚启动时工具探测 502
-            if (prev !== 'active') {
+            // 优化：若无缓存或状态刚变为 active，都主动探测一次，避免首屏没数字
+            if (!cached || typeof cached.count !== 'number' || prev !== 'active') {
                 badge.classList.add('show');
-                if (!cached) badge.textContent = '…';
+                if (!cached || typeof cached.count !== 'number') badge.textContent = '…';
                 const c = await fetchToolsCountWithRetry(svc.id, 4, 700);
                 badge.textContent = (c != null) ? String(c) : '—';
                 if (c != null) toolCountCache.set(svc.id, { count: c, ts: Date.now() });

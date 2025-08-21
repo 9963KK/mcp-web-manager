@@ -121,6 +121,17 @@ class MCPServiceManager:
             env = os.environ.copy()
             if service.env_vars:
                 env.update({k: str(v) for k, v in (service.env_vars or {}).items()})
+            # 最小实现：为常见包管理器注入缓存目录（可覆盖）以加快冷启动
+            try:
+                data_dir = "/data" if os.path.isdir("/data") else None
+                npm_cache_default = (f"{data_dir}/npm-cache" if data_dir else os.path.expanduser("~/.npm"))
+                uv_cache_default = (f"{data_dir}/uv-cache" if data_dir else os.path.expanduser("~/.cache/uv"))
+                pip_cache_default = (f"{data_dir}/pip-cache" if data_dir else os.path.expanduser("~/.cache/pip"))
+                env.setdefault("NPM_CONFIG_CACHE", npm_cache_default)
+                env.setdefault("UV_CACHE_DIR", uv_cache_default)
+                env.setdefault("PIP_CACHE_DIR", pip_cache_default)
+            except Exception:
+                pass
 
             working_dir = service.working_directory or None
 
@@ -146,14 +157,16 @@ class MCPServiceManager:
             mcp_ready = False
             try:
                 import time
-                for attempt in range(8):  # 8 * 0.5s = 4s max
+                # 加速就绪探测：前 2s 高频 200ms，其后 500ms，整体不超过 ~2.5s
+                delays = [0.2, 0.2, 0.2, 0.2, 0.2, 0.5, 0.5, 0.5]
+                for delay in delays:
                     try:
                         # 使用内部 MCP 客户端做最小化握手测试
                         from mcp.client.streamable_http import StreamableHTTPTransport
                         import asyncio
 
                         async def _test_mcp_ready():
-                            transport = StreamableHTTPTransport(f"http://127.0.0.1:{port}/mcp")
+                            transport = StreamableHTTPTransport(f"http://127.0.0.1:{port}/mcp/")
                             try:
                                 await transport.connect()
                                 # 尝试 list_tools（这是 tools/count 的核心操作）
@@ -174,7 +187,7 @@ class MCPServiceManager:
                             break
                     except Exception:
                         pass
-                    time.sleep(0.5)
+                    time.sleep(delay)
 
                 if not mcp_ready:
                     logger.warning("MCP protocol not ready on port %s after 4s, continuing anyway", port)
